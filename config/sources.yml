@@ -1,0 +1,142 @@
+# News Intelligence — North Macedonia Source Configuration
+# Languages: Macedonian (mk), Albanian (sq), English (en), Turkish (tr)
+
+sources:
+  # ── English ──────────────────────────────────────────────
+
+  - name: Meta.mk (EN)
+    url: https://meta.mk/en
+    rss: https://meta.mk/en/feed/
+    enabled: true
+
+  - name: Balkan Insight — North Macedonia
+    url: https://balkaninsight.com
+    rss: https://balkaninsight.com/category/bi/macedonia/feed/
+    enabled: true
+
+  - name: Lajme.mk (EN)
+    url: https://lajme.mk/en
+    rss: https://lajme.mk/en/rss/latest-posts
+    enabled: true
+
+  - name: Slobodna Evropa — English
+    url: https://www.slobodnaevropa.mk
+    rss: https://www.slobodnaevropa.mk/rss
+    enabled: true
+
+  # ── Macedonian ───────────────────────────────────────────
+
+  - name: Meta.mk (MK)
+    url: https://meta.mk
+    rss: https://meta.mk/feed/
+    enabled: true
+
+  - name: TIME.mk
+    url: https://time.mk
+    rss: https://time.mk/rss/all
+    enabled: true
+
+  - name: 4news.mk
+    url: https://4news.mk
+    rss: https://4news.mk/feed/
+    enabled: true
+
+  - name: Makfax
+    url: https://makfax.com.mk
+    rss: https://makfax.com.mk/feed/
+    enabled: true
+
+  - name: Kurir.mk
+    url: https://kurir.mk
+    rss: https://kurir.mk/feed
+    enabled: true
+
+  - name: Fokus.mk
+    url: https://fokus.mk
+    rss: https://fokus.mk/feed/
+    enabled: true
+
+  - name: Nezavisen.mk
+    url: https://nezavisen.mk
+    rss: https://nezavisen.mk/feed/
+    enabled: true
+
+  - name: MIA (Macedonian Information Agency)
+    url: https://mia.mk
+    rss: https://mia.mk/feed
+    enabled: true
+
+  - name: Sitel
+    url: https://sitel.com.mk
+    rss: https://sitel.com.mk/rss.xml
+    enabled: true
+
+  - name: Koha (MK)
+    url: https://mk.koha.mk
+    rss: https://mk.koha.mk/feed/
+    enabled: true
+
+  - name: TV21 (MK)
+    url: https://mk.tv21.tv
+    rss: https://mk.tv21.tv/feed/
+    enabled: true
+
+  - name: MRT (Macedonian Radio Television)
+    url: https://www.mrt.com.mk
+    rss: https://www.mrt.com.mk/rss.xml
+    enabled: true
+
+  - name: Kanal 5
+    url: https://kanal5.com.mk
+    enabled: false  # No RSS feed; returns 403. Enable when sitemap support added.
+
+  - name: TV2 Gostivar
+    url: https://tv2.com.mk
+    enabled: false  # No RSS feed. Enable when sitemap support added.
+
+  # ── Albanian ─────────────────────────────────────────────
+
+  - name: Meta.mk (SQ)
+    url: https://meta.mk/sq
+    rss: https://meta.mk/sq/feed/
+    enabled: true
+
+  - name: Lajme.mk (SQ)
+    url: https://lajme.mk
+    rss: https://lajme.mk/rss
+    enabled: true
+
+  - name: Slobodna Evropa — Albanian
+    url: https://www.slobodnaevropa.mk/sq
+    rss: https://www.slobodnaevropa.mk/sq/rss
+    enabled: true
+
+  - name: Alsat
+    url: https://alsat.mk
+    rss: https://alsat.mk/feed/
+    enabled: true
+
+  - name: TV21 (SQ)
+    url: https://sq.tv21.tv
+    rss: https://sq.tv21.tv/feed/
+    enabled: true
+
+  # ── Turkish ──────────────────────────────────────────────
+
+  - name: Koha (TR)
+    url: https://www.koha.mk/tr
+    rss: https://www.koha.mk/tr/feed/
+    enabled: true
+
+  - name: TimeBalkan
+    url: https://timebalkan.com
+    rss: https://timebalkan.com/feed/
+    enabled: true
+
+  - name: BTR (Balkan Türk)
+    url: https://www.balkanturk.org
+    enabled: false  # No RSS; enable when sitemap support added
+
+  - name: Kuzey Makedonya Türk Haberleri
+    url: https://www.turkkadinlari.org.tr
+    enabled: false  # Placeholder — add RSS when discovered

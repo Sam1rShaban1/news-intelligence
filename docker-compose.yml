@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: news
+      POSTGRES_PASSWORD: news
+      POSTGRES_DB: news_intelligence
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    mem_limit: 1g
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U news -d news_intelligence"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build: .
+    command: ["-m", "src.workers"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_LOG_LEVEL: INFO
+    volumes:
+      - ./config:/app/config:ro
+    mem_limit: 1g
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:news@postgres:5432/news_intelligence')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  web:
+    build: .
+    command: ["-m", "src.api.main"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    mem_limit: 512m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pgdata:
