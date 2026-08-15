@@ -53,11 +53,14 @@ Option B — run `docker compose build` directly on the Pi (slower, needs build 
 docker compose up -d postgres
 docker compose ps            # wait until postgres is "healthy"
 
-# 2. Apply migrations (creates tables up to revision 004)
-docker compose run --rm worker -m alembic upgrade head
-
-# 3. Start everything
+# 2. Start everything — a one-shot `migrate` service runs `alembic upgrade head`
+#    automatically (and worker/ner wait for it), so no manual migration step is needed.
+#    If you ever wipe the `pgdata` volume, just re-run `docker compose up -d`.
 docker compose up -d
+
+# (Optional) run migrations explicitly / inspect:
+# docker compose run --rm worker -m alembic upgrade head
+# docker compose run --rm worker -m alembic current
 ```
 
 `hf_cache` is a named volume shared only by the `ner` service. The GLiNER2 ONNX

@@ -23,6 +23,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
       NEWS_LOG_LEVEL: INFO
@@ -42,6 +44,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
       NEWS_LOG_LEVEL: INFO
@@ -55,6 +59,16 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  migrate:
+    build: .
+    command: ["-m", "alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+    restart: "no"
 
   web:
     build: .
