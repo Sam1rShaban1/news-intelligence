@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     # Paths
     config_dir: Path = Path("config")
 
-    # GLiNER (Phase 2)
-    gliner_model: str = "urchade/gliner_small-v2.1"
+    # GLiNER2 ONNX model (multilingual NER, runs in the separate `ner` service)
+    gliner_model: str = "lmo3/gliner2-multi-v1-onnx"
 
 
 settings = Settings()

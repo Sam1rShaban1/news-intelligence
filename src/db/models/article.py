@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -82,8 +83,15 @@ class Article(Base, TimestampMixin):
     # Full-text search
     search_vector = mapped_column(TSVECTOR, nullable=True)
 
+    # Sentiment analysis
+    sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sentiment_label: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
     # Relationships
     source: Mapped["Source"] = relationship(back_populates="articles")
+    entities: Mapped[list["Entity"]] = relationship(
+        back_populates="article", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         label = (self.title[:40] if self.title else "untitled") if self.title else "untitled"

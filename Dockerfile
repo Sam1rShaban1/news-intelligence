@@ -27,6 +27,8 @@ RUN pip install --no-cache-dir . 2>/dev/null; \
     "streamlit>=1.35" \
     "vaderSentiment>=3.3" \
     "pgvector>=0.3" \
+    "gliner2-onnx>=0.1" \
+    "onnxruntime>=1.18" \
     "pyyaml>=6.0" \
     "lxml"
 

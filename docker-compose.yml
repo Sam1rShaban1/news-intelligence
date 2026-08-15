@@ -36,6 +36,26 @@ services:
       timeout: 10s
       retries: 3
 
+  ner:
+    build: .
+    command: ["-m", "src.workers.ner_service"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_LOG_LEVEL: INFO
+    volumes:
+      - ./config:/app/config:ro
+      - hf_cache:/root/.cache/huggingface
+    mem_limit: 2g
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:news@postgres:5432/news_intelligence')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   web:
     build: .
     command: ["-m", "src.api.main"]
@@ -55,5 +75,24 @@ services:
       timeout: 5s
       retries: 3
 
+  dashboard:
+    build: .
+    command: ["-m", "streamlit", "run", "src/dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+    ports:
+      - "8501:8501"
+    mem_limit: 512m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8501/_stcore/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 volumes:
   pgdata:
+  hf_cache:

@@ -1,10 +1,11 @@
-"""Main worker entrypoint — runs scheduler + fetch + extract workers concurrently."""
+"""Main worker entrypoint — runs scheduler + fetch + extract + analyze workers concurrently."""
 
 import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
 from config.settings import settings
+from src.workers.analyze import run_analyze_worker_loop
 from src.workers.extract import run_extract_worker_loop
 from src.workers.fetch import run_fetch_worker_loop
 from src.workers.lifecycle import WorkerConfig, install_signal_handlers, is_shutdown_requested
@@ -29,11 +30,12 @@ def main() -> None:
         max_retries=settings.max_retries,
     )
 
-    # Run scheduler, fetch worker, and extract worker concurrently
-    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="worker") as executor:
+    # Run all workers concurrently
+    with ThreadPoolExecutor(max_workers=4, thread_name_prefix="worker") as executor:
         executor.submit(run_scheduler, config)
         executor.submit(run_fetch_worker_loop, config)
         executor.submit(run_extract_worker_loop, config)
+        executor.submit(run_analyze_worker_loop, config)
 
         # Block until shutdown signal
         while not is_shutdown_requested():

@@ -19,8 +19,11 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "pydantic-settings>=2.0",
     "streamlit>=1.35",
+    "streamlit-agraph>=0.0.43",
     "vaderSentiment>=3.3",
     "pgvector>=0.3",
+    "gliner2-onnx>=0.1",
+    "onnxruntime>=1.18",
 ]
 
 [project.optional-dependencies]
@@ -35,3 +38,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

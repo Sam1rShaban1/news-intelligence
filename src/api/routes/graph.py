@@ -1,0 +1,84 @@
+"""Graph route — entity co-occurrence edges for knowledge-graph visualization."""
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import desc, func, or_, select
+from sqlalchemy.orm import Session
+
+from src.api.deps import get_db
+from src.db.models.entity_edge import EntityEdge
+from src.db.models.entity_node import EntityNode
+
+router = APIRouter(tags=["graph"])
+
+from sqlalchemy.orm import aliased
+
+NodeA = aliased(EntityNode)
+NodeB = aliased(EntityNode)
+
+
+@router.get("/graph/cooccurrence")
+def graph_cooccurrence(
+    limit: int = Query(default=200, ge=1, le=1000),
+    min_weight: int = Query(default=1, ge=1),
+    label: str | None = Query(default=None, description="Restrict to edges touching this label"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Top co-occurrence edges with endpoint labels — ready for network viz."""
+    query = (
+        select(
+            EntityEdge.id,
+            EntityEdge.weight,
+            EntityEdge.node_a_id,
+            EntityEdge.node_b_id,
+            NodeA.canonical_text.label("a_text"),
+            NodeA.label.label("a_label"),
+            NodeB.canonical_text.label("b_text"),
+            NodeB.label.label("b_label"),
+        )
+        .join(NodeA, EntityEdge.node_a_id == NodeA.id)
+        .join(NodeB, EntityEdge.node_b_id == NodeB.id)
+        .where(EntityEdge.weight >= min_weight)
+    )
+
+    if label:
+        lbl = label.upper()
+        query = query.where(or_(NodeA.label == lbl, NodeB.label == lbl))
+
+    query = query.order_by(desc(EntityEdge.weight)).limit(limit)
+    rows = db.execute(query).all()
+
+    return {
+        "edges": [
+            {
+                "source": r.node_a_id,
+                "target": r.node_b_id,
+                "weight": r.weight,
+                "source_text": r.a_text,
+                "source_label": r.a_label,
+                "target_text": r.b_text,
+                "target_label": r.b_label,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/graph/stats")
+def graph_stats(db: Session = Depends(get_db)) -> dict:
+    """High-level knowledge-graph stats."""
+    nodes = db.scalar(select(func.count(EntityNode.id))) or 0
+    edges = db.scalar(select(func.count(EntityEdge.id))) or 0
+    articles = db.scalar(
+        select(func.count(EntityNode.id)).where(EntityNode.mention_count > 0)
+    ) or 0
+    by_label = db.execute(
+        select(EntityNode.label, func.sum(EntityNode.mention_count).label("mentions"))
+        .group_by(EntityNode.label)
+        .order_by(desc("mentions"))
+    ).all()
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "mentions_by_label": {r.label: int(r.mentions or 0) for r in by_label},
+    }

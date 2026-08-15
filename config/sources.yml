@@ -104,12 +104,12 @@ sources:
   - name: Lajme.mk (SQ)
     url: https://lajme.mk
     rss: https://lajme.mk/rss
-    enabled: true
+    enabled: false  # Feed returns 404; enable when correct RSS URL is found
 
   - name: Slobodna Evropa — Albanian
     url: https://www.slobodnaevropa.mk/sq
     rss: https://www.slobodnaevropa.mk/sq/rss
-    enabled: true
+    enabled: false  # Feed returns 404; enable when correct RSS URL is found
 
   - name: Alsat
     url: https://alsat.mk
@@ -119,7 +119,7 @@ sources:
   - name: TV21 (SQ)
     url: https://sq.tv21.tv
     rss: https://sq.tv21.tv/feed/
-    enabled: true
+    enabled: false  # DNS/connection failing; enable when reachable
 
   # ── Turkish ──────────────────────────────────────────────
 

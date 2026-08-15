@@ -8,6 +8,9 @@ from fastapi import FastAPI
 
 from config.settings import settings
 from src.api.routes import articles_router, health_router, search_router
+from src.api.routes.entities import router as entities_router
+from src.api.routes.graph import router as graph_router
+from src.api.routes.sentiment import router as sentiment_router
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
@@ -26,6 +29,9 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(articles_router)
     app.include_router(search_router)
+    app.include_router(entities_router)
+    app.include_router(sentiment_router)
+    app.include_router(graph_router)
 
     @app.on_event("startup")
     def on_startup() -> None:
