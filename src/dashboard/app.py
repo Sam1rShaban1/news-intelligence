@@ -2,6 +2,7 @@
 
 import os
 
+import httpx
 import streamlit as st
 from sqlalchemy import create_engine, text
 from streamlit_agraph import Config, Edge, Node, agraph
@@ -9,7 +10,35 @@ from streamlit_agraph import Config, Edge, Node, agraph
 DATABASE_URL = os.getenv(
     "NEWS_DATABASE_URL", "postgresql://news:news@localhost:5432/news_intelligence"
 )
+API_URL = os.getenv("NEWS_API_URL", "http://web:8000")
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+
+@st.cache_data(ttl=30)
+def api_search(params: dict) -> dict:
+    """Call the /search endpoint. Returns {'total':int,'results':[...]}."""
+    try:
+        r = httpx.get(f"{API_URL}/search", params=params, timeout=20)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:  # network/API errors shouldn't kill the tab
+        st.error(f"Search API unavailable: {e}")
+        return {"total": 0, "results": []}
+
+
+@st.cache_data(ttl=60)
+def api_analytics(days: int, interval: str, language: str | None) -> dict:
+    """Call /analytics/overview."""
+    try:
+        r = httpx.get(
+            f"{API_URL}/analytics/overview",
+            params={"days": days, "interval": interval, "language": language},
+            timeout=20,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return {}
 
 st.set_page_config(page_title="News Intelligence", layout="wide")
 st.title("News Intelligence — North Macedonia")
@@ -32,9 +61,92 @@ c5.metric("Failed", failed)
 c6.metric("Entities", entities)
 
 # ── Tabs ───────────────────────────────────────────────────
-tab_pipeline, tab_sentiment, tab_entities, tab_graph = st.tabs(
-    ["Pipeline", "Sentiment", "Entities", "Knowledge Graph"]
+tab_pipeline, tab_explore, tab_sentiment, tab_entities, tab_graph = st.tabs(
+    ["Pipeline", "Explore", "Sentiment", "Entities", "Knowledge Graph"]
 )
+
+with tab_explore:
+    st.subheader("Search & Explore")
+    q = st.text_input("Full-text search (leave blank to browse)", key="explore_q")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        lang = st.multiselect("Language", ["en", "mk", "sq", "tr"], key="explore_lang")
+    with c2:
+        sent = st.multiselect("Sentiment", ["pos", "neg", "neutral"], key="explore_sent")
+    with c3:
+        days = st.slider("Last N days", 1, 90, 30, key="explore_days")
+
+    with st.expander("Advanced filters"):
+        entity = st.text_input("Mentioning entity (normalized, e.g. skopje)", key="explore_entity")
+        predicate = st.text_input("With relationship predicate (e.g. appointed)", key="explore_pred")
+        source_id = st.number_input("Source id (0 = any)", min_value=0, value=0, step=1, key="explore_src")
+
+    params: dict = {"limit": 50, "offset": 0, "days": days}
+    if q:
+        params["q"] = q
+    if lang:
+        params["language"] = ",".join(lang)
+    if sent:
+        params["sentiment"] = ",".join(sent)
+    if entity:
+        params["entity"] = entity
+    if predicate:
+        params["predicate"] = predicate
+    if source_id:
+        params["source_id"] = source_id
+
+    if st.button("Search", key="explore_btn"):
+        data = api_search(params)
+        st.caption(f"{data.get('total', 0)} results")
+        for r in data.get("results", []):
+            badge = f"[{r['sentiment_label']}]" if r.get("sentiment_label") else ""
+            lang_b = r.get("language") or "und"
+            ents = ", ".join(f"{e['text']} ({e['label']})" for e in r.get("entities", [])[:4])
+            st.markdown(f"**[{r.get('title') or r.get('url')}]({r.get('url')})** {badge} · {lang_b}")
+            meta = f"{r.get('source_name') or ''}"
+            if r.get("published_date"):
+                meta += f" · {r['published_date'][:10]}"
+            if meta:
+                st.caption(meta)
+            if ents:
+                st.caption(f"entities: {ents}")
+
+    st.divider()
+    st.subheader("Trends")
+    ana = api_analytics(days, "day", ",".join(lang) if lang else None)
+    if ana:
+        sot = ana.get("sentiment_over_time", [])
+        if sot:
+            st.markdown("**Sentiment over time**")
+            st.area_chart(
+                {
+                    "pos": [r["pos"] for r in sot],
+                    "neg": [r["neg"] for r in sot],
+                    "neutral": [r["neutral"] for r in sot],
+                }
+            )
+
+            langmix = ana.get("language_mix", [])
+            if langmix:
+                buckets = sorted({r["bucket"][:10] for r in langmix})
+                langs = sorted({k for r in langmix for k in r if k != "bucket"})
+                series = {
+                    lg: [
+                        next((r.get(lg, 0) for r in langmix if r["bucket"][:10] == b), 0)
+                        for b in buckets
+                    ]
+                    for lg in langs
+                }
+                st.markdown("**Language mix over time**")
+                st.bar_chart(series)
+
+        te = ana.get("trending_entities", [])
+        if te:
+            st.markdown("**Trending entities (last %d days)**" % days)
+            st.dataframe(
+                [{"Entity": e["text"], "Type": e["label"], "Mentions": e["mentions"]} for e in te],
+                use_container_width=True,
+            )
 
 with tab_pipeline:
     st.subheader("Pipeline Status")

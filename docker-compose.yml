@@ -83,6 +83,7 @@ services:
         condition: service_healthy
     environment:
       NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_API_URL: http://web:8000
     ports:
       - "8501:8501"
     mem_limit: 512m
