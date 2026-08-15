@@ -56,6 +56,15 @@ def normalize_entity(text: str, label: str | None = None) -> str:
     return s
 
 
+def normalize_text(text: str) -> str:
+    """Normalize free text for lexical matching: transliterate Macedonian
+    Cyrillic to Latin, fold Turkish/Albanian diacritics to ASCII, lowercase
+    and collapse whitespace. Used so curated lexicons (authored in Latin) can
+    match original Cyrillic/diacritic text without a translation model.
+    """
+    return normalize_entity(text) if text else ""
+
+
 def normalize_entities(
     entities: list[dict], label: str | None = None
 ) -> list[dict]:

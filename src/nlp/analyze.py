@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 def analyze_article(article: Article) -> dict:
     """Run the sentiment stage on an extracted article."""
     text = article.content or article.summary or article.title or ""
-    return {"sentiment": analyze_sentiment(text)}
+    lang = getattr(article, "language", None) or "en"
+    return {"sentiment": analyze_sentiment(text, lang)}
 
 
 def store_results(article_id: int, results: dict) -> None:

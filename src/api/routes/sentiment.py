@@ -24,6 +24,20 @@ def sentiment_distribution(db: Session = Depends(get_db)) -> dict:
         .order_by(desc("count"))
     ).all()
 
+    lang_rows = db.execute(
+        select(
+            Article.language,
+            Article.sentiment_label,
+            func.count(Article.id).label("count"),
+        )
+        .where(Article.sentiment_label.isnot(None))
+        .group_by(Article.language, Article.sentiment_label)
+    ).all()
+    by_language: dict[str, dict[str, int]] = {}
+    for lr in lang_rows:
+        key = lr.language or "und"
+        by_language.setdefault(key, {})[lr.sentiment_label] = lr.count
+
     return {
         "distribution": [
             {
@@ -33,6 +47,7 @@ def sentiment_distribution(db: Session = Depends(get_db)) -> dict:
             }
             for r in rows
         ],
+        "by_language": by_language,
         "total_analyzed": sum(r.count for r in rows),
     }
 

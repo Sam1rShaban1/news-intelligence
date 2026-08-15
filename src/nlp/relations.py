@@ -19,7 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.db.models.entity import Entity
 from src.db.models.entity_node import EntityNode
 from src.db.models.relationship import Relationship
-from src.nlp.normalize import normalize_entity
+from src.nlp.normalize import normalize_entity, normalize_text
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,46 @@ RELATION_LEXICON: dict[str, str] = {
     "won": "won",
     "defeated": "won",
     "married": "married",
+    # --- Macedonian (transliterated, normalized) ---
+    "imenova": "appointed", "izbra": "appointed", "izbran": "appointed",
+    "naznaci": "appointed",
+    "rakovodi": "leads", "upravuva": "leads", "predvod": "leads",
+    "osnova": "founded", "sozda": "founded", "formira": "founded",
+    "se naogja vo": "located_in", "smesten vo": "located_in", "glaven grad na": "located_in",
+    "izjavi": "stated", "objavi": "stated", "izreche": "stated",
+    "poseduva": "owns", "kupi": "owns",
+    "poddrzhuva": "supports", "podkrepuva": "supports",
+    "kritikuva": "criticized", "napadna": "criticized",
+    "se sretna so": "met_with", "razgovara so": "met_with",
+    "potpisa": "signed", "se dogovori": "signed",
+    "pobedi": "won", "pobednik": "won",
+    "se vencha": "married", "se ozeni": "married",
+    # --- Albanian (diacritic-folded) ---
+    "emeroi": "appointed", "zgjodhi": "appointed", "zgjedhur": "appointed",
+    "udheheq": "leads", "drejton": "leads",
+    "themeloi": "founded", "krijoi": "founded",
+    "ndodhet ne": "located_in", "kryeqytet i": "located_in",
+    "deklaroi": "stated", "njoftoi": "stated",
+    "zoteron": "owns", "bleu": "owns",
+    "mbrojt": "supports", "mbeshtet": "supports",
+    "kritikoi": "criticized", "sulmoi": "criticized", "denoncoi": "criticized",
+    "u takua me": "met_with", "bisedoi me": "met_with",
+    "nenshkroi": "signed", "u marrevesh": "signed",
+    "fitoi": "won",
+    "u martua": "married",
+    # --- Turkish (diacritic-folded) ---
+    "atadi": "appointed", "secti": "appointed", "gorevlendirdi": "appointed",
+    "yonetir": "leads", "liderlik": "leads",
+    "kurdu": "founded", "olusturdu": "founded",
+    "yer alir": "located_in", "baskenti": "located_in",
+    "acikladi": "stated", "duyurdu": "stated", "belirtti": "stated",
+    "satin aldi": "owns",
+    "destekliyor": "supports", "destekledi": "supports",
+    "elestirdi": "criticized", "saldirdi": "criticized",
+    "gorustu": "met_with", "gorusme": "met_with",
+    "imzaladi": "signed", "anlasti": "signed",
+    "kazandi": "won", "maglup": "won",
+    "evlendi": "married",
 }
 
 # Longest phrases first so "meeting with" wins over "with".
@@ -87,8 +127,13 @@ def split_sentences(text: str) -> list[str]:
 
 
 def detect_predicate(between_text: str) -> str | None:
-    """Return a normalized predicate if a cue phrase is found, else None."""
-    m = _PHRASE_RE.search(between_text or "")
+    """Return a normalized predicate if a cue phrase is found, else None.
+
+    The text is normalized (Cyrillic->Latin, diacritic fold) first so MK/SQ/TR
+    cue phrases in the lexicon match original-script text.
+    """
+    norm = normalize_text(between_text or "")
+    m = _PHRASE_RE.search(norm)
     if not m:
         return None
     return RELATION_LEXICON[m.group(0).lower()]

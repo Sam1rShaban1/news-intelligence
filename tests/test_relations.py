@@ -25,3 +25,14 @@ def test_detect_predicate_longest_phrase_wins():
 def test_detect_predicate_none():
     assert detect_predicate("The weather was sunny today") is None
     assert detect_predicate("") is None
+
+
+def test_detect_predicate_multilingual():
+    # Macedonian Cyrillic cue phrase -> transliterated then matched
+    assert detect_predicate("Тој изјави дека...") == "stated"
+    # Turkish cue phrase (diacritic-folded)
+    assert detect_predicate("Bakan açıkladı ki") == "stated"
+    # Albanian cue phrase
+    assert detect_predicate("ai deklaroi se") == "stated"
+    # Macedonian 'located in'
+    assert detect_predicate("Скопје се наоѓа во Македонија") == "located_in"
