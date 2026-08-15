@@ -271,6 +271,10 @@ with tab_graph:
                 )
                 if choice:
                     with engine.connect() as conn:
+                        node_text = conn.execute(
+                            text("SELECT canonical_text FROM entity_nodes WHERE id = :nid"),
+                            {"nid": choice},
+                        ).scalar()
                         arts = conn.execute(
                             text(
                                 "SELECT a.title, a.url, a.sentiment_label, a.language "
@@ -291,11 +295,34 @@ with tab_graph:
                             ),
                             {"nid": choice},
                         ).all()
+                        rels = conn.execute(
+                            text(
+                                "SELECT r.predicate, r.confidence, "
+                                "s.canonical_text AS s_text, s.label AS s_label, "
+                                "o.canonical_text AS o_text, o.label AS o_label "
+                                "FROM relationships r "
+                                "JOIN entity_nodes s ON r.subject_node_id = s.id "
+                                "JOIN entity_nodes o ON r.object_node_id = o.id "
+                                "WHERE r.subject_node_id = :nid OR r.object_node_id = :nid "
+                                "ORDER BY r.confidence DESC LIMIT 30"
+                            ),
+                            {"nid": choice},
+                        ).all()
                     st.markdown(f"**{len(arts)} articles** mention this entity:")
                     for r in arts:
                         badge = f" [{r.sentiment_label}]" if r.sentiment_label else ""
                         st.markdown(f"**[{r.title or 'untitled'}]({r.url})**{badge}  ·  {r.language}")
-                    st.markdown("**Connected entities:**")
+                    st.markdown("**Typed relationships:**")
+                    if rels:
+                        for r in rels:
+                            # Orient so the inspected entity reads naturally
+                            if r.s_text == node_text:
+                                st.caption(f"{r.s_text} — {r.predicate} → {r.o_text} ({r.confidence:.2f})")
+                            else:
+                                st.caption(f"{r.o_text} ← {r.predicate} — {r.s_text} ({r.confidence:.2f})")
+                    else:
+                        st.caption("No typed relations detected (co-occurrence only).")
+                    st.markdown("**Connected entities (co-occurrence):**")
                     for r in neigh:
                         st.caption(f"{r.canonical_text} ({r.label}) — co-occurred {r.weight}×")
             else:

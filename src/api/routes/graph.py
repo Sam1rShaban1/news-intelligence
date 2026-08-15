@@ -1,12 +1,13 @@
 """Graph route — entity co-occurrence edges for knowledge-graph visualization."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from src.api.deps import get_db
 from src.db.models.entity_edge import EntityEdge
 from src.db.models.entity_node import EntityNode
+from src.db.models.relationship import Relationship
 
 router = APIRouter(tags=["graph"])
 
@@ -14,6 +15,8 @@ from sqlalchemy.orm import aliased
 
 NodeA = aliased(EntityNode)
 NodeB = aliased(EntityNode)
+Subj = aliased(EntityNode)
+Obj = aliased(EntityNode)
 
 
 @router.get("/graph/cooccurrence")
@@ -68,17 +71,111 @@ def graph_stats(db: Session = Depends(get_db)) -> dict:
     """High-level knowledge-graph stats."""
     nodes = db.scalar(select(func.count(EntityNode.id))) or 0
     edges = db.scalar(select(func.count(EntityEdge.id))) or 0
-    articles = db.scalar(
-        select(func.count(EntityNode.id)).where(EntityNode.mention_count > 0)
-    ) or 0
+    triples = db.scalar(select(func.count(Relationship.id))) or 0
     by_label = db.execute(
         select(EntityNode.label, func.sum(EntityNode.mention_count).label("mentions"))
         .group_by(EntityNode.label)
         .order_by(desc("mentions"))
     ).all()
+    by_pred = db.execute(
+        select(Relationship.predicate, func.count(Relationship.id).label("cnt"))
+        .group_by(Relationship.predicate)
+        .order_by(desc("cnt"))
+    ).all()
 
     return {
         "nodes": nodes,
         "edges": edges,
+        "triples": triples,
         "mentions_by_label": {r.label: int(r.mentions or 0) for r in by_label},
+        "triples_by_predicate": {r.predicate: int(r.cnt) for r in by_pred},
+    }
+
+
+@router.get("/graph/relationships")
+def graph_relationships(
+    predicate: str | None = Query(default=None, description="Filter by predicate (e.g. appointed)"),
+    label: str | None = Query(default=None, description="Restrict to triples touching this entity label"),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Typed relationship triples (subject → predicate → object)."""
+    query = (
+        select(
+            Relationship.id,
+            Relationship.predicate,
+            Relationship.article_id,
+            Relationship.confidence,
+            Subj.canonical_text.label("subject_text"),
+            Subj.label.label("subject_label"),
+            Obj.canonical_text.label("object_text"),
+            Obj.label.label("object_label"),
+        )
+        .join(Subj, Relationship.subject_node_id == Subj.id)
+        .join(Obj, Relationship.object_node_id == Obj.id)
+    )
+    if predicate:
+        query = query.where(Relationship.predicate == predicate)
+    if label:
+        lbl = label.upper()
+        query = query.where(or_(Subj.label == lbl, Obj.label == lbl))
+
+    query = query.order_by(desc(Relationship.confidence)).limit(limit)
+    rows = db.execute(query).all()
+
+    return {
+        "relationships": [
+            {
+                "subject": r.subject_text,
+                "subject_label": r.subject_label,
+                "predicate": r.predicate,
+                "object": r.object_text,
+                "object_label": r.object_label,
+                "article_id": r.article_id,
+                "confidence": r.confidence,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/entities/{node_id}/relationships")
+def node_relationships(
+    node_id: int = Path(..., description="EntityNode id"),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Typed relationships where the given entity is subject or object."""
+    query = (
+        select(
+            Relationship.predicate,
+            Relationship.article_id,
+            Relationship.confidence,
+            Subj.canonical_text.label("subject_text"),
+            Subj.label.label("subject_label"),
+            Obj.canonical_text.label("object_text"),
+            Obj.label.label("object_label"),
+        )
+        .join(Subj, Relationship.subject_node_id == Subj.id)
+        .join(Obj, Relationship.object_node_id == Obj.id)
+        .where((Relationship.subject_node_id == node_id) | (Relationship.object_node_id == node_id))
+        .order_by(desc(Relationship.confidence))
+        .limit(limit)
+    )
+    rows = db.execute(query).all()
+
+    return {
+        "node_id": node_id,
+        "relationships": [
+            {
+                "subject": r.subject_text,
+                "subject_label": r.subject_label,
+                "predicate": r.predicate,
+                "object": r.object_text,
+                "object_label": r.object_label,
+                "article_id": r.article_id,
+                "confidence": r.confidence,
+            }
+            for r in rows
+        ],
     }

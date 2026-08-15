@@ -14,6 +14,7 @@ from src.db.models.article import Article
 from src.db.session import SessionLocal
 from src.nlp.graph import build_article_graph
 from src.nlp.ner import extract_entities
+from src.nlp.relations import build_relationships
 from src.workers.lifecycle import WorkerConfig, install_signal_handlers, is_shutdown_requested
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ def run_ner_cycle(config: WorkerConfig) -> int:
                 text = article.content or article.summary or article.title or ""
                 raw_entities = extract_entities(text)
                 build_article_graph(session, article.id, raw_entities)
+                triples = build_relationships(session, article.id, raw_entities, text)
 
                 article.status = "analyzed"
                 article.analyzed_at = datetime.now(timezone.utc)
@@ -64,9 +66,10 @@ def run_ner_cycle(config: WorkerConfig) -> int:
 
                 session.commit()
                 logger.debug(
-                    "NER done: %s (%d entities)",
+                    "NER done: %s (%d entities, %d triples)",
                     article.title[:40] if article.title else article.url,
                     len(raw_entities),
+                    triples,
                 )
 
             except Exception as e:

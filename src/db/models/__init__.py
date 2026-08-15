@@ -6,6 +6,7 @@ from .article import Article
 from .entity import Entity
 from .entity_node import EntityNode
 from .entity_edge import EntityEdge
+from .relationship import Relationship
 
 __all__ = [
     "Base",
@@ -15,4 +16,5 @@ __all__ = [
     "Entity",
     "EntityNode",
     "EntityEdge",
+    "Relationship",
 ]
