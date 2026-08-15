@@ -278,7 +278,7 @@ with tab_graph:
     label_filter = st.selectbox(
         "Entity type", ["All", "PER", "ORG", "LOC", "MISC", "EVENT"], key="graph_label"
     )
-    top_n = st.slider("Top nodes", 20, 150, 60, key="graph_topn")
+    top_n = st.slider("Top nodes", 20, 150, 50, key="graph_topn")
 
     def fetch_graph(label: str, top_n: int):
         with engine.connect() as conn:
@@ -299,8 +299,8 @@ with tab_graph:
                     "FROM entity_edges e "
                     "JOIN entity_nodes a ON e.node_a_id = a.id "
                     "JOIN entity_nodes b ON e.node_b_id = b.id "
-                    "WHERE e.node_a_id = ANY(:ids) AND e.node_b_id = ANY(:ids) "
-                    "ORDER BY e.weight DESC LIMIT 500"
+                "WHERE e.node_a_id = ANY(:ids) AND e.node_b_id = ANY(:ids) "
+                "ORDER BY e.weight DESC LIMIT 300"
                 ),
                 {"ids": node_ids},
             ).all()
@@ -355,6 +355,24 @@ with tab_graph:
             maxZoom=4,
             minZoom=0.2,
         )
+        # Tune physics so large graphs settle instead of jittering forever.
+        # Default minVelocity=1 never stops; centralGravity=0.3 + avoidOverlap=0
+        # collapse/overlap nodes as edges grow -> perpetual erratic motion.
+        config.physics = {
+            "enabled": True,
+            "solver": "forceAtlas2Based",
+            "minVelocity": 0.2,
+            "timestep": 0.4,
+            "stabilization": {"enabled": True, "iterations": 1500, "fit": True},
+            "forceAtlas2Based": {
+                "gravitationalConstant": -60,
+                "centralGravity": 0.005,
+                "springLength": 160,
+                "springConstant": 0.06,
+                "damping": 0.55,
+                "avoidOverlap": 0.7,
+            },
+        }
         st.write(f"Showing {len(g_nodes)} nodes, {len(g_edges)} edges")
         agraph(nodes=g_nodes, edges=g_edges, config=config)
 
