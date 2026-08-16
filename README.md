@@ -43,7 +43,7 @@ All services are defined in `docker-compose.yml` and built from the single `Dock
 | `worker`    | `news-intelligence-worker`      | 1 GB    | Scheduler + fetch + extract + sentiment. |
 | `ner`       | `news-intelligence-worker`      | 2 GB    | GLiNER2 ONNX NER + knowledge-graph construction (model cached in `hf_cache`). |
 | `web`       | `news-intelligence-web`         | 512 MB  | FastAPI REST API (`:8000`). |
-| `dashboard` | `news-intelligence-dashboard`   | 512 MB  | Streamlit UI (`:8501`). |
+| `frontend` | `news-intelligence-frontend`     | 128 MB  | React + Vite + Tailwind SPA (nginx) on `:8501`; proxies `/api/*` → `web:8000`. |
 
 > The `worker` and `ner` services use the **same image** but different commands
 > (`src.workers` vs `src.workers.ner_service`) so the heavy NER model never blocks
@@ -84,7 +84,7 @@ new → fetched → extracted → sentiment_done → analyzed
 
 - **Language / runtime:** Python 3.12 (slim).
 - **Web framework:** FastAPI + Uvicorn.
-- **Dashboard:** Streamlit (with `pyvis` for the interactive graph).
+- **Frontend:** React 19 + Vite + Tailwind CSS v4 (SPA, served by nginx); interactive knowledge-graph via the bundled chart kit. Talks to the API through an nginx reverse proxy at `/api`.
 - **ORM / migrations:** SQLAlchemy 2.x + Alembic.
 - **Database:** PostgreSQL 16 with `pgvector` (for future embedding use) and built-in
   full-text search.
@@ -211,20 +211,29 @@ curl -s "http://localhost:8000/search?q=skopje" | head
 
 ---
 
-## Dashboard (`dashboard`, port 8501)
+## Web frontend (`frontend`, port 8501)
 
-A Streamlit app with tabs:
+A lightweight React 19 + Vite + Tailwind CSS v4 single-page app, built to a static bundle
+and served by nginx. It is the primary UI, replacing the old Streamlit dashboard. nginx
+proxies `/api/*` to the `web` (FastAPI) service, so the browser only ever talks to one
+origin.
 
-- **Pipeline** — live status counts, language breakdown, recent articles.
-- **Explore** — full-text **Search & Explore** plus **Trends** (volume over time).
-- **Sentiment** — sentiment distribution and recent sentiment.
-- **Entities** — top entities and entity-type distribution.
-- **Graph** — interactive **knowledge-graph** view (entity co-occurrence network via
-  `pyvis`, with stabilisation/spring-layout controls) and an entity inspector.
+Views:
+
+- **Overview** — KPI cards, sentiment-over-time, language mix, trending entities.
+- **Explore** — full-text search with language / sentiment / source / entity / date filters.
+- **Sentiment** — sentiment distribution (overall + by language) and recent sentiment.
+- **Entities** — searchable entity directory (PER / ORG / LOC) with an entity inspector
+  (mentioning articles + relationships).
+- **Graph** — interactive knowledge-graph (entity co-occurrence network) with an entity
+  inspector.
 - **Stories** — event clusters with their articles and dominant sentiment.
 
-Heavy queries (summary cards, graph fetch) are cached (`@st.cache_data`) so the UI stays
-responsive.
+The UI falls back to bundled mock data when the backend is unreachable, so it renders even
+before ingestion has produced anything.
+
+The app source lives in `ui/` (`Dockerfile`, `nginx.conf`, `vite.config.ts`, `src/`). It is
+built and run automatically by `docker compose up`.
 
 ---
 
@@ -299,7 +308,7 @@ docker compose build            # source + Dockerfile changes are picked up auto
 
 ```bash
 docker compose up -d
-# dashboard: http://localhost:8501   API: http://localhost:8000
+# frontend: http://localhost:8501   API: http://localhost:8000
 ```
 
 ### Deploying to a Raspberry Pi 4B (8 GB)
@@ -308,8 +317,8 @@ docker compose up -d
 
    ```bash
    docker compose build
-   docker save news-intelligence-worker news-intelligence-web \
-     news-intelligence-dashboard pgvector/pgvector:pg16 | gzip > ni_images.tar.gz
+    docker save news-intelligence-worker news-intelligence-web \
+      news-intelligence-frontend pgvector/pgvector:pg16 | gzip > ni_images.tar.gz
    scp ni_images.tar.gz pi@<PI_IP>:/tmp/
    ssh pi@<PI_IP> 'docker load < /tmp/ni_images.tar.gz'
    ```
@@ -399,7 +408,7 @@ Optional env: `NEWS_SMOKE_SOURCES=<n>`, `NEWS_SMOKE_ITERS=<n>`.
 | `articles_failed` > 0 | Bad/blocked feed. Check `docker compose logs worker`; disable the source in `config/sources.yml`. |
 | Sentiment all `neutral` for MK/SQ/TR | Expected with the lexicon fallback; switch to `NEWS_SENTIMENT_MODEL=transformer`. |
 | NER finds little | GLiNER2 recall varies by language; the graph still builds from whatever is extracted. |
-| Dashboard shows no graph | Run the full smoke (`NEWS_SMOKE_NER=1`) or let `ner` process articles first. |
+| Frontend graph / stories empty | Run the full smoke (`NEWS_SMOKE_NER=1`) or let `ner` process articles first. |
 | Cyrillic search misses | Ensure `search_vector` is populated — re-run `scripts/backfill_search_vector.py` if needed. |
 | `pg_isready` healthcheck fails | Postgres not healthy yet / wrong password in `NEWS_DATABASE_URL`. |
 
