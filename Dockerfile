@@ -25,7 +25,6 @@ RUN pip install --no-cache-dir . 2>/dev/null; \
     "fastapi>=0.115" \
     "uvicorn[standard]>=0.30" \
     "pydantic-settings>=2.0" \
-    "streamlit>=1.35" \
     "vaderSentiment>=3.3" \
     "pgvector>=0.3" \
     "gliner2-onnx>=0.1" \
