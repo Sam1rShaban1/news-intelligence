@@ -61,8 +61,8 @@ c5.metric("Failed", failed)
 c6.metric("Entities", entities)
 
 # ── Tabs ───────────────────────────────────────────────────
-tab_pipeline, tab_explore, tab_sentiment, tab_entities, tab_graph = st.tabs(
-    ["Pipeline", "Explore", "Sentiment", "Entities", "Knowledge Graph"]
+tab_pipeline, tab_explore, tab_sentiment, tab_entities, tab_graph, tab_stories = st.tabs(
+    ["Pipeline", "Explore", "Sentiment", "Entities", "Knowledge Graph", "Stories"]
 )
 
 with tab_explore:
@@ -457,6 +457,68 @@ with tab_graph:
                         st.caption(f"{r.canonical_text} ({r.label}) — co-occurred {r.weight}×")
             else:
                 st.info("No matching entity.")
+
+# ── Stories (event clusters from entity overlap) ──────────
+with tab_stories:
+    st.subheader("Stories — event clusters")
+    st.caption(
+        "Articles grouped by shared entities within a recent window. "
+        "Built from the knowledge graph; no extra model."
+    )
+
+    col_lang, col_sent, col_limit = st.columns(3)
+    with col_lang:
+        s_lang = st.selectbox(
+            "Language", ["All", "en", "mk", "sq", "tr"], key="stories_lang"
+        )
+    with col_sent:
+        s_sent = st.selectbox(
+            "Sentiment", ["All", "pos", "neg", "neutral"], key="stories_sent"
+        )
+    with col_limit:
+        s_limit = st.slider("Max stories", 10, 100, 40, key="stories_limit")
+
+    params = {"limit": s_limit, "days": 30}
+    if s_lang != "All":
+        params["language"] = s_lang
+    if s_sent != "All":
+        params["sentiment"] = s_sent
+
+    try:
+        import httpx as _hx
+
+        r = _hx.get(f"{API_URL}/stories", params=params, timeout=20)
+        r.raise_for_status()
+        stories_data = r.json().get("stories", [])
+    except Exception as e:
+        st.error(f"Stories API unavailable: {e}")
+        stories_data = []
+
+    if not stories_data:
+        st.info("No stories yet — the NER service is still building clusters.")
+    else:
+        for s in stories_data:
+            badge = ""
+            if s.get("dominant_sentiment"):
+                color = {"pos": "green", "neg": "red", "neutral": "gray"}.get(
+                    s["dominant_sentiment"], "gray"
+                )
+                badge = f":{color}[{s['dominant_sentiment']}]"
+            ents = ", ".join(
+                e["text"] for e in (s.get("top_entities") or [])[:5]
+            )
+            with st.container(border=True):
+                st.markdown(f"**{s['title']}** {badge}")
+                meta = f"{s.get('member_count', 0)} sources"
+                if s.get("language"):
+                    meta += f" · {s['language']}"
+                if s.get("last_seen"):
+                    meta += f" · last seen {s['last_seen'][:10]}"
+                st.caption(meta)
+                if ents:
+                    st.markdown(f"*Entities:* {ents}")
+                if s.get("summary"):
+                    st.markdown(f"> {s['summary']}")
 
 # ── Source health (collapsed) ──────────────────────────────
 with st.expander("Source Health"):

@@ -23,6 +23,7 @@ from .base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from .source import Source
+    from .story import Story
 
 
 class Article(Base, TimestampMixin):
@@ -91,6 +92,10 @@ class Article(Base, TimestampMixin):
     source: Mapped["Source"] = relationship(back_populates="articles")
     entities: Mapped[list["Entity"]] = relationship(
         back_populates="article", cascade="all, delete-orphan"
+    )
+    stories: Mapped[list["Story"]] = relationship(
+        secondary="story_articles",
+        back_populates="members",
     )
 
     def __repr__(self) -> str:

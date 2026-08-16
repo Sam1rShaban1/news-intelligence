@@ -35,5 +35,10 @@ class Settings(BaseSettings):
     # GLiNER2 ONNX model (multilingual NER, runs in the separate `ner` service)
     gliner_model: str = "lmo3/gliner2-multi-v1-onnx"
 
+    # Sentiment: auto = transformer if model present else lexicon/VADER;
+    # transformer = force ONNX (falls back if missing); lexicon = skip ONNX.
+    sentiment_model: str = "auto"
+    sentiment_model_path: str = "/app/models/sentiment.onnx"
+
 
 settings = Settings()

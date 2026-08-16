@@ -15,6 +15,7 @@ from src.db.session import SessionLocal
 from src.nlp.graph import build_article_graph
 from src.nlp.ner import extract_entities
 from src.nlp.relations import build_relationships
+from src.nlp.stories import assign_story
 from src.workers.lifecycle import WorkerConfig, install_signal_handlers, is_shutdown_requested
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ def run_ner_cycle(config: WorkerConfig) -> int:
                 raw_entities = extract_entities(text)
                 build_article_graph(session, article.id, raw_entities)
                 triples = build_relationships(session, article.id, raw_entities, text)
+                assign_story(session, article)
 
                 article.status = "analyzed"
                 article.analyzed_at = datetime.now(timezone.utc)

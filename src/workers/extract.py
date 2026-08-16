@@ -9,6 +9,7 @@ from sqlalchemy import select, text
 from src.collector.extractor import extract_article
 from src.db.models.article import Article
 from src.db.session import SessionLocal
+from src.nlp.summarize import extractive_summary
 from src.workers.lifecycle import WorkerConfig, is_shutdown_requested
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,11 @@ def run_extract_cycle(config: WorkerConfig) -> int:
                 article.title = result["title"] or article.title
                 article.author = result["author"] or article.author
                 article.content = result["content"]
-                article.summary = result["summary"] or article.summary
+                # Prefer our extractive summary; fall back to the extractor's.
+                summary = result["summary"]
+                if not summary and article.content:
+                    summary = extractive_summary(article.content)
+                article.summary = summary or article.summary
                 article.word_count = result["word_count"]
                 article.language = detect_language(article.title or article.content)
                 article.status = "extracted"

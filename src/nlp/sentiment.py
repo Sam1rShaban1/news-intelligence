@@ -3,12 +3,23 @@
 English text uses VADER. Macedonian (mk), Albanian (sq) and Turkish (tr) use a
 curated lexicon (Phase 4) run on the normalized (transliterated, diacritic-folded)
 text — no heavy transformer, safe for the Pi CPU.
+
+Phase 8: when available, a small multilingual ONNX transformer
+(cardiffnlp/twitter-xlm-roberta-base-sentiment-latest) is used for all languages;
+on failure or when the model is absent, the lexicon/VADER fallback applies.
+Controlled by NEWS_SENTIMENT_MODEL (auto | transformer | lexicon).
 """
+
+import logging
 
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
+from config.settings import settings
 from src.nlp.lexicon import lexicon_sentiment
 from src.nlp.normalize import normalize_text
+from src.nlp.sentiment_onnx import transformer_sentiment
+
+logger = logging.getLogger(__name__)
 
 _analyzer = SentimentIntensityAnalyzer()
 
@@ -24,6 +35,15 @@ def analyze_sentiment(text: str, lang: str | None = "en") -> dict:
     """
     if not text or not text.strip():
         return {"score": 0.0, "label": "neutral", "method": "none"}
+
+    mode = settings.sentiment_model
+    if mode in ("auto", "transformer"):
+        try:
+            tr = transformer_sentiment(text)
+            if tr is not None:
+                return tr
+        except Exception:
+            logger.debug("Transformer sentiment unavailable", exc_info=True)
 
     if lang in LEXICON_LANGS:
         score, label, hits = lexicon_sentiment(normalize_text(text), lang)

@@ -12,6 +12,7 @@ from src.api.routes.analytics import router as analytics_router
 from src.api.routes.entities import router as entities_router
 from src.api.routes.graph import router as graph_router
 from src.api.routes.sentiment import router as sentiment_router
+from src.api.routes.stories import router as stories_router
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(entities_router)
     app.include_router(sentiment_router)
     app.include_router(graph_router)
+    app.include_router(stories_router)
 
     @app.on_event("startup")
     def on_startup() -> None:
