@@ -1,8 +1,3 @@
-FROM python:3.12-slim AS exporter
-RUN pip install --no-cache-dir torch transformers "optimum[exporters]"
-COPY scripts/export_sentiment_onnx.py /app/scripts/
-RUN python /app/scripts/export_sentiment_onnx.py
-
 FROM python:3.12-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -28,7 +23,7 @@ RUN pip install --no-cache-dir . 2>/dev/null; \
     "newspaper4k[lxml]>=0.9" \
     "apscheduler>=3.10" \
     "fastapi>=0.115" \
-    "uvicorn[standard]>=0.30" \
+    "uvicorn[standard]>=3.0" \
     "pydantic-settings>=2.0" \
     "streamlit>=1.35" \
     "vaderSentiment>=3.3" \
@@ -39,8 +34,13 @@ RUN pip install --no-cache-dir . 2>/dev/null; \
     "pyyaml>=6.0" \
     "lxml"
 
-# Bake the ONNX sentiment model from the export stage (~200 MB, no torch needed at runtime).
-COPY --from=exporter /app/models /app/models
+# Bake the multilingual ONNX sentiment model (int8 quantized, ~279 MB).
+# Source: onnx-community/twitter-xlm-roberta-base-sentiment-ONNX
+RUN mkdir -p /app/models && \
+    curl -sL "https://huggingface.co/onnx-community/twitter-xlm-roberta-base-sentiment-ONNX/resolve/main/onnx/model_int8.onnx" \
+         -o /app/models/sentiment.onnx && \
+    curl -sL "https://huggingface.co/onnx-community/twitter-xlm-roberta-base-sentiment-ONNX/resolve/main/tokenizer.json" \
+         -o /app/models/sentiment_tokenizer.json
 
 COPY . .
 
