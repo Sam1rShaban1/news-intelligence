@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir . 2>/dev/null; \
     "newspaper4k[lxml]>=0.9" \
     "apscheduler>=3.10" \
     "fastapi>=0.115" \
-    "uvicorn[standard]>=3.0" \
+    "uvicorn[standard]>=0.30" \
     "pydantic-settings>=2.0" \
     "streamlit>=1.35" \
     "vaderSentiment>=3.3" \

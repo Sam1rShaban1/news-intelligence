@@ -25,7 +25,15 @@ logger = logging.getLogger(__name__)
 def get_or_create_node(
     session, canonical: str, label: str, raw_alias: str | None, now: datetime
 ) -> EntityNode:
-    """Find the canonical node, creating it (or merging the alias) if missing."""
+    """Find the canonical node (exact, normalized match), creating it if missing.
+
+    De-duplication of surface-form variants (e.g. shkup / shkupi, transliterated
+    Cyrillic, digit/diacritic noise) is handled by `normalize_entity`, so this only
+    matches on the already-normalized canonical text. Any further merging of
+    residual near-duplicates is done explicitly and reviewably via
+    scripts/merge_entities.py (similarity-only, DRY_RUN first) — never implicitly
+    during ingestion, to avoid false merges.
+    """
     node = session.execute(
         select(EntityNode).where(
             EntityNode.canonical_text == canonical, EntityNode.label == label

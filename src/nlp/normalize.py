@@ -7,6 +7,7 @@ Merges surface-form variants of the same entity so the graph links them:
 Pure stdlib — no model, safe to run on every extraction.
 """
 
+import re
 import unicodedata
 
 # Macedonian Cyrillic -> Latin transliteration (official RNM transliteration).
@@ -33,9 +34,15 @@ _SPECIAL_FOLD = {
     "â": "a", "Â": "a", "î": "i", "Î": "i", "ș": "s", "Ș": "s", "ț": "t", "Ț": "t",
 }
 
-
 def normalize_entity(text: str, label: str | None = None) -> str:
-    """Return a canonical lowercase key for an entity surface form."""
+    """Return a canonical lowercase key for an entity surface form.
+
+    Handles cross-script normalization (Macedonian Cyrillic -> Latin, Turkish /
+    Albanian diacritic folding) and lowercasing. Remaining surface-form variants
+    of the same real-world entity (inflections like shkup/shkupi, near-spelling
+    like macedonia/maqedonia) are unified by fuzzy resolution in the graph
+    layer (src/nlp/graph.py), not by a hardcoded alias list.
+    """
     if not text:
         return ""
     s = text.strip()
@@ -53,7 +60,55 @@ def normalize_entity(text: str, label: str | None = None) -> str:
     # 4. Lowercase + collapse internal whitespace
     s = " ".join(s.lower().split())
 
+    # 5. Drop digits / punctuation (e.g. "skopje12" -> "skopje",
+    #    "north-macedonia" -> "north macedonia"); keep letters + spaces.
+    s = re.sub(r"[^a-z\s]", "", s)
+    s = " ".join(s.split())
+
     return s
+
+
+# Common inflectional suffixes (Albanian, Macedonian, Slavic, Turkish-ish) used to
+# reduce surface forms to a comparable base before similarity comparison. Curated
+# by *language grammar*, not by entity name, so this is universal rather than a
+# hardcoded alias list.
+_INFLECTION_SUFFIXES = (
+    "ish", "ski", "ska", "ova", "ov", "it", "ut", "at", "et",
+    "te", "ja", "ve", "ne", "se", "i", "e", "a",
+)
+
+
+def _base_form(s: str) -> str:
+    """Strip a single trailing inflectional suffix if doing so leaves >=4 chars.
+
+    Suffixes are tried shortest-first so e.g. "tirane" strips "e" -> "tiran"
+    (not "ne" -> "tira").
+    """
+    s = s.strip()
+    for suf in sorted(_INFLECTION_SUFFIXES, key=len):
+        if len(s) - len(suf) >= 4 and s.endswith(suf):
+            return s[: -len(suf)]
+    return s
+
+
+def entity_similarity(a: str, b: str) -> float:
+    """Universal similarity in [0, 1] for two normalized entity canonical texts.
+
+    - 1.0 if identical or identical after stripping a common inflectional suffix
+      (shkup / shkupi, tirana / tirane, macedonia / maqedonia, ohrid / ohrida).
+    - otherwise a difflib ratio, so near-spellings score high without any
+      per-name alias table.
+    """
+    if a == b:
+        return 1.0
+    ba, bb = _base_form(a), _base_form(b)
+    if ba and ba == bb:
+        return 1.0
+    if ba and (ba == b or bb == a):
+        return 0.95
+    import difflib
+
+    return difflib.SequenceMatcher(None, a, b).ratio()
 
 
 def normalize_text(text: str) -> str:
