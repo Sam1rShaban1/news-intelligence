@@ -4,6 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 # System deps for newspaper4k, lxml, psycopg2, healthchecks
 RUN apt-get update && apt-get install -y --no-install-recommends \
