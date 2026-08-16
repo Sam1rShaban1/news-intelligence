@@ -56,7 +56,12 @@ def _summary_stats() -> dict:
 
 @st.cache_data(ttl=60)
 def _graph_data(label: str, top_n: int):
-    """Cached knowledge-graph node/edge fetch (re-run safe)."""
+    """Cached knowledge-graph node/edge fetch (re-run safe).
+
+    Edge limit scales with node count (5 edges per node on average) so the
+    graph stays dense as the "Top nodes" slider increases, capped at 5000.
+    """
+    edge_limit = min(top_n * 5, 5000)
     with engine.connect() as conn:
         nodes = conn.execute(
             text(
@@ -76,9 +81,9 @@ def _graph_data(label: str, top_n: int):
                 "JOIN entity_nodes a ON e.node_a_id = a.id "
                 "JOIN entity_nodes b ON e.node_b_id = b.id "
                 "WHERE e.node_a_id = ANY(:ids) AND e.node_b_id = ANY(:ids) "
-                "ORDER BY e.weight DESC LIMIT 300"
+                "ORDER BY e.weight DESC LIMIT :edge_lim"
             ),
-            {"ids": node_ids},
+            {"ids": node_ids, "edge_lim": edge_limit},
         ).all()
     return nodes, edges
 

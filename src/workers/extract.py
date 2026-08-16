@@ -4,11 +4,12 @@ import logging
 import re
 from datetime import datetime, timezone
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from src.collector.extractor import extract_article
 from src.db.models.article import Article
 from src.db.session import SessionLocal
+from src.nlp.normalize import normalize_text
 from src.nlp.summarize import extractive_summary
 from src.workers.lifecycle import WorkerConfig, is_shutdown_requested
 
@@ -89,6 +90,10 @@ def run_extract_cycle(config: WorkerConfig) -> int:
                 article.extracted_at = datetime.now(timezone.utc)
                 article.error_message = None
                 article.started_at = None
+                # Build transliterated search_vector so MK/SQ Cyrillic is
+                # searchable via Latin queries (e.g. "skopje" matches "Скопје").
+                raw = f"{article.title or ''} {article.content or ''}"
+                article.search_vector = func.to_tsvector("simple", normalize_text(raw))
                 extracted_count += 1
 
                 session.commit()

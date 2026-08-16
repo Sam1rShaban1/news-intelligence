@@ -8,6 +8,7 @@ from src.db.models.article import Article
 from src.db.models.entity import Entity
 from src.db.models.entity_node import EntityNode
 from src.db.models.relationship import Relationship
+from src.nlp.normalize import normalize_text
 
 
 def parse_list(value) -> list[str]:
@@ -32,7 +33,8 @@ def apply_filters(
 ):
     """Apply the shared set of search filters to any select rooted on `Article`."""
     if q:
-        ts = func.websearch_to_tsquery("simple", q)
+        norm_q = normalize_text(q)
+        ts = func.websearch_to_tsquery("simple", norm_q)
         stmt = stmt.where(Article.search_vector.op("@@")(ts))
 
     langs = parse_list(language)
