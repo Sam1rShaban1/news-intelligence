@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from src.api.deps import get_db
 from src.db.models.entity import Entity
 from src.db.models.entity_node import EntityNode
+from src.db.models.source import Source
 
 router = APIRouter(tags=["entities"])
 
@@ -156,8 +157,10 @@ def node_articles(
             Article.sentiment_label,
             Article.language,
             Article.published_date,
+            Source.name.label("source_name"),
         )
         .join(Entity, Entity.article_id == Article.id)
+        .join(Source, Source.id == Article.source_id)
         .where(Entity.node_id == node_id)
         .order_by(desc(Article.discovered_at))
         .limit(limit)
@@ -173,6 +176,7 @@ def node_articles(
                 "url": r.url,
                 "sentiment_label": r.sentiment_label,
                 "language": r.language,
+                "source_name": r.source_name,
                 "published_date": r.published_date.isoformat() if r.published_date else None,
             }
             for r in rows
