@@ -40,7 +40,13 @@ def claim_articles(session, batch_size: int, zombie_timeout_minutes: int) -> lis
 
 
 def run_ner_cycle(config: WorkerConfig) -> int:
-    """One NER cycle: claim articles, extract entities, build graph."""
+    """One NER cycle: claim a batch, extract entities, build graph.
+
+    `build_article_graph` / `build_relationships` / `assign_story` no longer
+    commit internally — each successfully processed article is persisted in a
+    single transaction (graph writes + status flip), which removes the redundant
+    per-step commits that previously dominated NER latency at scale.
+    """
     processed = 0
 
     with SessionLocal() as session:
@@ -50,15 +56,12 @@ def run_ner_cycle(config: WorkerConfig) -> int:
             if is_shutdown_requested():
                 break
 
-            article.started_at = datetime.now(timezone.utc)
-            session.commit()
-
             try:
                 text = article.content or article.summary or article.title or ""
                 raw_entities = extract_entities(text)
                 build_article_graph(session, article.id, raw_entities)
                 triples = build_relationships(session, article.id, raw_entities, text)
-                assign_story(session, article)
+                assign_story(session, article, recompute=False)
 
                 article.status = "analyzed"
                 article.analyzed_at = datetime.now(timezone.utc)
@@ -75,6 +78,7 @@ def run_ner_cycle(config: WorkerConfig) -> int:
                 )
 
             except Exception as e:
+                session.rollback()
                 article.retry_count += 1
                 article.error_message = str(e)[:500]
 

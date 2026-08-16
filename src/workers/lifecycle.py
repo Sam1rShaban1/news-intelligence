@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WorkerConfig:
     poll_interval: int = 5  # seconds between polls
-    batch_size: int = 10  # articles per claim
+    batch_size: int = 30  # articles per claim
     zombie_timeout_minutes: int = 5  # stuck task threshold
     max_retries: int = 3
 

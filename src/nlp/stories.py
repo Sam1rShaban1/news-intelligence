@@ -102,8 +102,14 @@ def _recompute(session, story: Story) -> None:
     story.entity_node_ids = sorted(set(int(x) for x in (ids or [])))
 
 
-def assign_story(session, article: Article) -> Story | None:
-    """Attach `article` to an existing story or create a new one. Returns it."""
+def assign_story(session, article: Article, recompute: bool = True) -> Story | None:
+    """Attach `article` to an existing story or create a new one. Returns it.
+
+    With `recompute=False` (the live NER path) the aggregate fields are updated
+    incrementally — O(1) per article — instead of re-aggregating all members,
+    which keeps the NER stage cheap at scale. `recompute=True` (backfill) does a
+    full refresh and is also used to fix dominant_sentiment/language/avg score.
+    """
     art_ids = article_entity_ids(session, article.id)
     if not art_ids:
         return None
@@ -128,14 +134,30 @@ def assign_story(session, article: Article) -> Story | None:
             story_articles.c.article_id == article.id,
         )
     ).scalar()
+
     if already is None:
         session.execute(
             story_articles.insert().values(
                 story_id=story.id, article_id=article.id
             )
         )
+        # Incremental aggregate update (no full re-aggregation).
+        story.member_count = (story.member_count or 0) + 1
+        disc = article.discovered_at or datetime.now(timezone.utc)
+        if story.first_seen is None or disc < story.first_seen:
+            story.first_seen = disc
+        if story.last_seen is None or disc > story.last_seen:
+            story.last_seen = disc
+        base = set(int(x) for x in (story.entity_node_ids or []))
+        story.entity_node_ids = sorted(base | art_ids)
+        if article.sentiment_score is not None:
+            n = story.member_count
+            prev = story.avg_sentiment_score or 0.0
+            story.avg_sentiment_score = round((prev * (n - 1) + article.sentiment_score) / n, 4)
 
-    _recompute(session, story)
+    if recompute:
+        _recompute(session, story)
+
     session.flush()
     return story
 

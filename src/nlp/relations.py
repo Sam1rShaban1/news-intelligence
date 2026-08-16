@@ -218,5 +218,5 @@ def build_relationships(session, article_id: int, raw_entities: list[dict], text
             session.execute(stmt)
             created += 1
 
-    session.commit()
+    session.flush()
     return created

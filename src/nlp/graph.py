@@ -121,6 +121,6 @@ def build_article_graph(session, article_id: int, raw_entities: list[dict]) -> i
     session.flush()
     if len(node_ids) >= 2:
         increment_cooccurrence(session, node_ids)
-    session.commit()
+    session.flush()
 
     return len(node_ids)

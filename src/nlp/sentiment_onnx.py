@@ -45,7 +45,14 @@ def _load() -> tuple:
         import onnxruntime as ort
         from tokenizers import Tokenizer
 
-        _session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        # Cap intra-op threads so ORT doesn't oversubscribe the Pi's few cores
+        # (avoids contention with the fetch/extract workers running alongside).
+        so = ort.SessionOptions()
+        so.intra_op_num_threads = min(os.cpu_count() or 1, 4)
+        so.inter_op_num_threads = 1
+        _session = ort.InferenceSession(
+            model_path, sess_options=so, providers=["CPUExecutionProvider"]
+        )
         _tokenizer = Tokenizer.from_file(tok_path)
     except Exception as e:  # pragma: no cover - environment dependent
         logger.warning("Failed to load sentiment ONNX model: %s", e)

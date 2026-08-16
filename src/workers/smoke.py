@@ -31,8 +31,9 @@ from src.db.models.relationship import Relationship
 from src.db.models.source import Source
 from src.db.session import SessionLocal
 from src.workers.analyze import run_analyze_cycle
+from src.collector.fetcher import discover_articles
 from src.workers.extract import run_extract_cycle
-from src.workers.fetch import _fetch_source, run_fetch_cycle
+from src.workers.fetch import _process_source, run_fetch_cycle
 from src.workers.lifecycle import WorkerConfig
 from src.workers.ner_service import run_ner_cycle
 
@@ -61,15 +62,16 @@ def _bounded_fetch(config: WorkerConfig, limit_sources: int | None) -> int:
         ).scalars().all()
         for src in sources:
             try:
-                total += _fetch_source(session, src, config)
+                entries = discover_articles(src)
+                total += _process_source(session, src, entries)
                 src.last_scanned_at = datetime.now(timezone.utc)
                 src.last_error = None
                 session.commit()
             except Exception as e:  # keep going through bad sources
-                src.error_count += 1
-                src.last_error = str(e)[:500]
-                session.commit()
-                logger.warning("Fetch failed for %s: %s", src.name, e)
+                    src.error_count += 1
+                    src.last_error = str(e)[:500]
+                    session.commit()
+                    logger.warning("Fetch failed for %s: %s", src.name, e)
     return total
 
 

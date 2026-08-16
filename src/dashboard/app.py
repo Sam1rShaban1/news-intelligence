@@ -40,17 +40,60 @@ def api_analytics(days: int, interval: str, language: str | None) -> dict:
     except Exception:
         return {}
 
+@st.cache_data(ttl=60)
+def _summary_stats() -> dict:
+    """Cached DB summary used by the top metric cards (re-run safe)."""
+    with engine.connect() as conn:
+        return {
+            "total": conn.scalar(text("SELECT count(*) FROM articles")) or 0,
+            "sources": conn.scalar(text("SELECT count(*) FROM sources WHERE enabled")) or 0,
+            "extracted": conn.scalar(text("SELECT count(*) FROM articles WHERE status='extracted'")) or 0,
+            "analyzed": conn.scalar(text("SELECT count(*) FROM articles WHERE status='analyzed'")) or 0,
+            "failed": conn.scalar(text("SELECT count(*) FROM articles WHERE status='failed'")) or 0,
+            "entities": conn.scalar(text("SELECT count(*) FROM entities")) or 0,
+        }
+
+
+@st.cache_data(ttl=60)
+def _graph_data(label: str, top_n: int):
+    """Cached knowledge-graph node/edge fetch (re-run safe)."""
+    with engine.connect() as conn:
+        nodes = conn.execute(
+            text(
+                "SELECT id, canonical_text, label, mention_count "
+                "FROM entity_nodes "
+                + ("WHERE label = :lbl " if label != "All" else "")
+                + "ORDER BY mention_count DESC LIMIT :lim"
+            ),
+            {"lbl": label, "lim": top_n} if label != "All" else {"lim": top_n},
+        ).all()
+        node_ids = [r.id for r in nodes]
+        edges = conn.execute(
+            text(
+                "SELECT e.node_a_id, e.node_b_id, e.weight, "
+                "a.canonical_text AS a_text, b.canonical_text AS b_text "
+                "FROM entity_edges e "
+                "JOIN entity_nodes a ON e.node_a_id = a.id "
+                "JOIN entity_nodes b ON e.node_b_id = b.id "
+                "WHERE e.node_a_id = ANY(:ids) AND e.node_b_id = ANY(:ids) "
+                "ORDER BY e.weight DESC LIMIT 300"
+            ),
+            {"ids": node_ids},
+        ).all()
+    return nodes, edges
+
+
 st.set_page_config(page_title="News Intelligence", layout="wide")
 st.title("News Intelligence — North Macedonia")
 
 # ── Summary cards ──────────────────────────────────────────
-with engine.connect() as conn:
-    total = conn.scalar(text("SELECT count(*) FROM articles")) or 0
-    sources = conn.scalar(text("SELECT count(*) FROM sources WHERE enabled")) or 0
-    extracted = conn.scalar(text("SELECT count(*) FROM articles WHERE status='extracted'")) or 0
-    analyzed = conn.scalar(text("SELECT count(*) FROM articles WHERE status='analyzed'")) or 0
-    failed = conn.scalar(text("SELECT count(*) FROM articles WHERE status='failed'")) or 0
-    entities = conn.scalar(text("SELECT count(*) FROM entities")) or 0
+_stats = _summary_stats()
+total = _stats["total"]
+sources = _stats["sources"]
+extracted = _stats["extracted"]
+analyzed = _stats["analyzed"]
+failed = _stats["failed"]
+entities = _stats["entities"]
 
 c1, c2, c3, c4, c5, c6 = st.columns(6)
 c1.metric("Articles", total)
@@ -280,33 +323,7 @@ with tab_graph:
     )
     top_n = st.slider("Top nodes", 20, 150, 50, key="graph_topn")
 
-    def fetch_graph(label: str, top_n: int):
-        with engine.connect() as conn:
-            nodes = conn.execute(
-                text(
-                    "SELECT id, canonical_text, label, mention_count "
-                    "FROM entity_nodes "
-                    + ("WHERE label = :lbl " if label != "All" else "")
-                    + "ORDER BY mention_count DESC LIMIT :lim"
-                ),
-                {"lbl": label, "lim": top_n} if label != "All" else {"lim": top_n},
-            ).all()
-            node_ids = [r.id for r in nodes]
-            edges = conn.execute(
-                text(
-                    "SELECT e.node_a_id, e.node_b_id, e.weight, "
-                    "a.canonical_text AS a_text, b.canonical_text AS b_text "
-                    "FROM entity_edges e "
-                    "JOIN entity_nodes a ON e.node_a_id = a.id "
-                    "JOIN entity_nodes b ON e.node_b_id = b.id "
-                "WHERE e.node_a_id = ANY(:ids) AND e.node_b_id = ANY(:ids) "
-                "ORDER BY e.weight DESC LIMIT 300"
-                ),
-                {"ids": node_ids},
-            ).all()
-        return nodes, edges
-
-    nodes, edges = fetch_graph(label_filter, top_n)
+    nodes, edges = _graph_data(label_filter, top_n)
 
     if not nodes:
         st.info("No entities yet — the NER service is still building the graph.")
