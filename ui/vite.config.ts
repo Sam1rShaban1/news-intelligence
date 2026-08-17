@@ -12,6 +12,9 @@ export default defineConfig({
     minify: true,
   },
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    include: ['d3-force', 'd3-zoom', 'd3-selection', 'louvain'],
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
