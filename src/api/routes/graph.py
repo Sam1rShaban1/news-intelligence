@@ -21,12 +21,18 @@ Obj = aliased(EntityNode)
 
 @router.get("/graph/cooccurrence")
 def graph_cooccurrence(
-    limit: int = Query(default=200, ge=1, le=1000),
+    node_limit: int = Query(default=0, ge=0, le=10000, description="Restrict to the top-N entities by mention count (0 = all nodes)"),
     min_weight: int = Query(default=1, ge=1),
+    limit: int = Query(default=200000, ge=1, le=200000, description="Safety cap on number of returned edges"),
     label: str | None = Query(default=None, description="Restrict to edges touching this label"),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Top co-occurrence edges with endpoint labels — ready for network viz."""
+    """Co-occurrence edges among the chosen entity set — ready for network viz.
+
+    `node_limit` picks the top-N entities (by mention count) and returns ALL edges
+    connecting them; `node_limit=0` returns the full graph. `min_weight` and `label`
+    further filter edges. This makes "how many nodes to show" a direct control.
+    """
     query = (
         select(
             EntityEdge.id,
@@ -47,7 +53,18 @@ def graph_cooccurrence(
         lbl = label.upper()
         query = query.where(or_(NodeA.label == lbl, NodeB.label == lbl))
 
-    query = query.order_by(desc(EntityEdge.weight)).limit(limit)
+    if node_limit and node_limit > 0:
+        nids = db.execute(
+            select(EntityNode.id).order_by(desc(EntityNode.mention_count)).limit(node_limit)
+        ).scalars().all()
+        if nids:
+            node_set = set(int(x) for x in nids)
+            query = query.where(
+                EntityEdge.node_a_id.in_(node_set),
+                EntityEdge.node_b_id.in_(node_set),
+            )
+
+    query = query.limit(limit)
     rows = db.execute(query).all()
 
     return {
