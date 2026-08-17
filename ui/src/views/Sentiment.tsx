@@ -36,6 +36,7 @@ export function Sentiment() {
     negative: { label: 'Negative', color: 'red' },
   }
 
+  const total = dist?.total_analyzed ?? 0
   const pieData = (dist?.distribution ?? []).map((item: any) => ({ name: normLabel(item.label), value: item.count }))
   const byLangData = LANGS.map(l => {
     const d = dist?.by_language?.[l] ?? {}
@@ -48,11 +49,34 @@ export function Sentiment() {
         <Section title="OVERALL DISTRIBUTION" sub={dist ? `${dist.total_analyzed?.toLocaleString()} ANALYZED` : ''}>
           <Card>
             {!dist && !distError ? <SkelChartArea height={208} /> : distError ? <EmptyState msg="COULD NOT REACH API" /> : pieData.length === 0 ? <EmptyState msg="NO DATA" /> : (
-              <PieChart data={pieData} config={pieConfig} dataKey="value" nameKey="name" innerRadius={0.4} bloom="off" className="h-52">
-                <Pie variant="hatched" />
-                <Legend />
-                <Tooltip labelKey="name" />
-              </PieChart>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 0.85fr) 1.15fr', gap: 16, alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
+                  {['positive', 'negative', 'neutral'].map(k => {
+                    const it = pieData.find((p: any) => p.name === k)
+                    const c = it?.value ?? 0
+                    const pct = total ? (c / total) * 100 : 0
+                    const colors: Record<string, string> = { positive: '#28d26e', negative: '#f04646', neutral: '#358ff3' }
+                    const names: Record<string, string> = { positive: 'Positive', negative: 'Negative', neutral: 'Neutral' }
+                    return (
+                      <div key={k} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 8, alignItems: 'center' }}>
+                        <span style={{ width: 10, height: 10, background: colors[k] }} />
+                        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em' }}>{names[k]}</span>
+                        <span style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
+                          {pct.toFixed(1)}% <span style={{ color: '#777', fontSize: 9 }}>· {c.toLocaleString()}</span>
+                        </span>
+                      </div>
+                    )
+                  })}
+                  <div style={{ borderTop: '1px solid #d4d4cc', marginTop: 2, paddingTop: 8, fontSize: 10, letterSpacing: '0.08em', color: '#555550', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>TOTAL</span><span>{total.toLocaleString()}</span>
+                  </div>
+                </div>
+                <PieChart data={pieData} config={pieConfig} dataKey="value" nameKey="name" innerRadius={0.4} bloom="off" className="h-52">
+                  <Pie variant="hatched" />
+                  <Legend />
+                  <Tooltip labelKey="name" />
+                </PieChart>
+              </div>
             )}
           </Card>
         </Section>
