@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from 'd3-force'
 import { zoom, zoomIdentity } from 'd3-zoom'
 import type { ZoomBehavior, ZoomTransform } from 'd3-zoom'
 import { select } from 'd3-selection'
-import louvain from 'louvain'
 import { api } from '../lib/api'
-import { Section, Card, SentimentChip, LangBadge, SkelChartArea, EmptyState } from '../components/Layout'
+import GraphWorker from '../workers/graphLayout.worker.ts?worker&inline'
+import { runLayout, reheat } from '../workers/layoutCore'
+import { SentimentChip, LangBadge, EmptyState } from '../components/Layout'
 
 // ── Shapes per entity type ────────────────────────────────────────────────────
 // PER  →  Circle           (a person is round, organic)
@@ -142,7 +142,7 @@ export function Graph() {
   const [stats, setStats] = useState<any>(null)
   const [graphError, setGraphError] = useState(false)
   const [hovered, setHovered] = useState<GraphNode | null>(null)
-  const [minWeight, setMinWeight] = useState(3)
+  const [nodeLimit, setNodeLimit] = useState(400)
   const [labelFilter, setLabelFilter] = useState('ALL')
   const [colorMode, setColorMode] = useState<ColorMode>('cluster')
   const [selected, setSelected] = useState<GraphNode | null>(null)
@@ -151,16 +151,18 @@ export function Graph() {
   const [sidebarRelations, setSidebarRelations] = useState<any[]>([])
   const [sidebarLoading, setSidebarLoading] = useState(false)
   const [focusId, setFocusId] = useState<string | null>(null)
+  const [, setLayoutTick] = useState(0)
 
   // Animation / interaction refs
   const dimRef = useRef({ w: 900, h: 560, dpr: 1 })
   const graphRef = useRef<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null)
-  const simRef = useRef<any>(null)
+  const workerRef = useRef<Worker | null>(null)
   const hoveredRef = useRef<GraphNode | null>(null)
   const selectedRef = useRef<GraphNode | null>(null)
   const colorModeRef = useRef<ColorMode>('cluster')
   const dirtyRef = useRef(true)
   const transformRef = useRef<ZoomTransform>(zoomIdentity)
+  const userZoomedRef = useRef(false)
   const zoomRef = useRef<ZoomBehavior<HTMLCanvasElement, unknown> | null>(null)
   const patternCache = useRef<Map<string, CanvasPattern>>(new Map())
   const bgPatternRef = useRef<CanvasPattern | null>(null)
@@ -201,66 +203,119 @@ export function Graph() {
     hullsRef.current = hulls
   }, [])
 
-  // Fetch graph data + build / cluster / simulate
+  // Fetch graph data + hand off layout to a Web Worker (with main-thread fallback)
   useEffect(() => {
     setGraphError(false)
     setGraphData(null)
     graphRef.current = null
-    simRef.current?.stop()
+    userZoomedRef.current = false
+    workerRef.current?.terminate()
+    workerRef.current = null
 
-    api.graphCooccurrence({ limit: 400, min_weight: minWeight, label: labelFilter !== 'ALL' ? labelFilter : undefined })
-      .then((r: any) => {
-        const edges: GraphEdge[] = (r.edges ?? []).map((e: any) => ({
-          source: String(e.source),
-          target: String(e.target),
-          weight: e.weight,
-        }))
-        const nodeMap = new Map<string, GraphNode>()
-        for (const e of edges) {
-          for (const [id, txt, lbl] of [
-            [e.source, r.edges.find((x: any) => String(x.source) === e.source)?.source_text, r.edges.find((x: any) => String(x.source) === e.source)?.source_label],
-            [e.target, r.edges.find((x: any) => String(x.target) === e.target)?.target_text, r.edges.find((x: any) => String(x.target) === e.target)?.target_label],
-          ] as [string, string, string][]) {
-            if (!nodeMap.has(id)) {
-              nodeMap.set(id, { id, text: txt ?? id, label: lbl ?? 'MISC', x: 0, y: 0, vx: 0, vy: 0, weight: 0, cluster: 0 })
-            }
-          }
-          nodeMap.get(e.source)!.weight += e.weight
-          nodeMap.get(e.target)!.weight += e.weight
+    let worker: Worker | null = null
+    let stopFallback: (() => void) | null = null
+    let layoutStarted = false
+    let watchdog: any = null
+    try {
+      worker = new GraphWorker()
+      workerRef.current = worker
+      worker.onmessage = (ev: MessageEvent) => applyMessage(ev.data)
+    } catch {
+      worker = null
+    }
+    // If the worker never produces a layout (e.g. it failed to start), fall back
+    // to running the same layout on the main thread so the graph still renders.
+    if (worker) {
+      watchdog = setTimeout(() => {
+        if (layoutStarted || workerRef.current !== worker) return
+        worker?.terminate()
+        workerRef.current = null
+        if (graphRef.current) {
+          stopFallback = runLayout(
+            graphRef.current.nodes as any,
+            graphRef.current.edges as any,
+            dimRef.current.w,
+            dimRef.current.h,
+            {
+              onInit: (c, count) => applyMessage({ type: 'init', clusters: c, count }),
+              onTick: (b) => applyMessage({ type: 'tick', buf: b }),
+              onDone: (b) => applyMessage({ type: 'done', buf: b }),
+            },
+          )
         }
-        const nodes = Array.from(nodeMap.values())
-        const maxNodeW = nodes.reduce((m, n) => Math.max(m, n.weight), 0) || 1
-        maxNodeWRef.current = maxNodeW
+      }, 6000)
+    }
 
-        // ── Community detection (Louvain) ──
-        const ids = nodes.map(n => n.id)
-        const links = edges.map(e => ({ source: e.source, target: e.target, weight: e.weight }))
-        let clusterOf = new Map<string, number>()
-        try {
-          const raw = (louvain as any).jLouvain().nodes(ids).edges(links)() as Record<string, number>
-          clusterOf = new Map(Object.entries(raw).map(([k, v]) => [String(k), v as number]))
-        } catch {
-          nodes.forEach((n, i) => clusterOf.set(n.id, 0))
+    const applyMessage = (data: any) => {
+      const g = graphRef.current
+      if (!g) return
+      if (data.type === 'init') {
+        for (const n of g.nodes) n.cluster = data.clusters[n.id] ?? 0
+        const { w: W, h: H } = dimRef.current
+        const K = data.count
+        const R = Math.min(W, H) * 0.32
+        const anchors = new Map<number, { x: number; y: number }>()
+        for (let k = 0; k < K; k++) {
+          const ang = (k / Math.max(1, K)) * Math.PI * 2 - Math.PI / 2
+          anchors.set(k, { x: W / 2 + R * Math.cos(ang), y: H / 2 + R * Math.sin(ang) })
         }
-        const unique = [...new Set(Array.from(clusterOf.values()))]
-        const clusterIndex = new Map(unique.map((c, i) => [c, i]))
-        nodes.forEach(n => { n.cluster = clusterIndex.get(clusterOf.get(n.id) ?? 0) ?? 0 })
-
-        // cluster metadata (counts + representative term)
+        anchorRef.current = anchors
         const counts = new Map<number, number>()
         const repW = new Map<number, number>()
         const repT = new Map<number, string>()
-        for (const n of nodes) {
+        for (const n of g.nodes) {
           counts.set(n.cluster, (counts.get(n.cluster) ?? 0) + 1)
           if ((repW.get(n.cluster) ?? 0) < n.weight) { repW.set(n.cluster, n.weight); repT.set(n.cluster, n.text) }
         }
         clusterInfoRef.current = [...counts.keys()]
           .map(c => ({ index: c, count: counts.get(c)!, repr: repT.get(c) ?? '' }))
           .sort((a, b) => b.count - a.count)
+        const top = [...g.nodes].sort((a, b) => b.weight - a.weight).slice(0, 22).map(n => n.id)
+        topLabelRef.current = new Set(top)
+        dirtyRef.current = true
+        setLayoutTick(t => t + 1) // re-render so the legend picks up the new clusters
+        layoutStarted = true
+        if (watchdog) clearTimeout(watchdog)
+        } else if (data.type === 'tick') {
+          const buf = data.buf as Float32Array
+          const nodes = g.nodes
+          for (let i = 0; i < nodes.length; i++) { nodes[i].x = buf[2 * i]; nodes[i].y = buf[2 * i + 1] }
+          recomputeHulls()
+          dirtyRef.current = true
+        } else if (data.type === 'done') {
+          const buf = data.buf as Float32Array
+          const nodes = g.nodes
+          for (let i = 0; i < nodes.length; i++) { nodes[i].x = buf[2 * i]; nodes[i].y = buf[2 * i + 1] }
+          recomputeHulls()
+          dirtyRef.current = true
+          fitToView()
+        }
+    }
+
+    api.graphCooccurrence({ node_limit: nodeLimit === 0 ? 0 : nodeLimit, min_weight: 1, label: labelFilter !== 'ALL' ? labelFilter : undefined })
+      .then((r: any) => {
+        // One-pass node map (O(E), was O(E^2) via per-endpoint r.edges.find)
+        const nodeInfo = new Map<string, { text: string; label: string }>()
+        const cleanEdges: GraphEdge[] = []
+        for (const e of (r.edges ?? [])) {
+          const s = String(e.source), t = String(e.target)
+          if (!nodeInfo.has(s)) nodeInfo.set(s, { text: e.source_text ?? s, label: e.source_label ?? 'MISC' })
+          if (!nodeInfo.has(t)) nodeInfo.set(t, { text: e.target_text ?? t, label: e.target_label ?? 'MISC' })
+          cleanEdges.push({ source: s, target: t, weight: e.weight })
+        }
+        const nodes: GraphNode[] = []
+        const nodeMap = new Map<string, GraphNode>()
+        for (const [id, info] of nodeInfo) {
+          const n: GraphNode = { id, text: info.text, label: info.label, x: (Math.random() - 0.5) * 200, y: (Math.random() - 0.5) * 200, vx: 0, vy: 0, weight: 0, cluster: 0 }
+          nodes.push(n); nodeMap.set(id, n)
+        }
+        for (const e of cleanEdges) { nodeMap.get(e.source)!.weight += e.weight; nodeMap.get(e.target)!.weight += e.weight }
+        const maxNodeW = nodes.reduce((m, n) => Math.max(m, n.weight), 0) || 1
+        maxNodeWRef.current = maxNodeW
 
         // adjacency for highlight
         const adj = new Map<string, Set<string>>()
-        for (const e of edges) {
+        for (const e of cleanEdges) {
           if (!adj.has(e.source)) adj.set(e.source, new Set())
           if (!adj.has(e.target)) adj.set(e.target, new Set())
           adj.get(e.source)!.add(e.target)
@@ -268,57 +323,43 @@ export function Graph() {
         }
         adjRef.current = adj
 
-        const { w: W, h: H } = dimRef.current
-        const K = clusterIndex.size
-        const anchors = new Map<number, { x: number; y: number }>()
-        const R = Math.min(W, H) * 0.32
-        for (let k = 0; k < K; k++) {
-          const ang = (k / Math.max(1, K)) * Math.PI * 2 - Math.PI / 2
-          anchors.set(k, { x: W / 2 + R * Math.cos(ang), y: H / 2 + R * Math.sin(ang) })
-        }
-        anchorRef.current = anchors
-
-        // seed positions near cluster anchor
-        for (const n of nodes) {
-          const a = anchors.get(n.cluster)!
-          n.x = a.x + (Math.random() - 0.5) * 80
-          n.y = a.y + (Math.random() - 0.5) * 80
-        }
-
-        const g = { nodes, edges }
+        const g = { nodes, edges: cleanEdges }
         graphRef.current = g
         setGraphData(g)
-
-        const maxW = edges.reduce((m, e) => Math.max(m, e.weight), 0) || 1
-        const sim = forceSimulation(nodes as any)
-          .force('link', forceLink(links as any).id((d: any) => d.id)
-            .distance((d: any) => 28 + (1 - d.weight / maxW) * 64)
-            .strength((d: any) => 0.05 + (d.weight / maxW) * 0.5))
-          .force('charge', forceManyBody().strength(-160).distanceMax(320))
-          .force('collide', forceCollide().radius((d: any) => nodeRadius(d as any) + 3).strength(0.85))
-          .force('center', forceCenter(W / 2, H / 2))
-          .force('x', forceX((d: any) => anchors.get((d as GraphNode).cluster)!.x).strength(0.06))
-          .force('y', forceY((d: any) => anchors.get((d as GraphNode).cluster)!.y).strength(0.06))
-        sim.velocityDecay(0.42).alpha(1).alphaDecay(0.05).alphaMin(0.01)
-        sim.on('tick', () => { dirtyRef.current = true })
-        sim.on('end', () => { recomputeHulls(); dirtyRef.current = true })
-        // Pre-warm synchronously: run the layout to (near) convergence in one blocking
-        // step so the graph appears settled immediately instead of animating for ~5s.
-        sim.stop()
-        for (let i = 0; i < 250; i++) sim.tick()
-        recomputeHulls()
-        dirtyRef.current = true
-        // Short, subtle animated tail (~0.5s) so it still feels alive.
-        sim.alpha(0.03).alphaDecay(0.08).alphaMin(0.005).restart()
-        simRef.current = sim
-
-        const top = [...nodes].sort((a, b) => b.weight - a.weight).slice(0, 22).map(n => n.id)
-        topLabelRef.current = new Set(top)
-        dirtyRef.current = true
+        if (worker) {
+          worker.postMessage({
+            type: 'start',
+            nodes: nodes.map(n => ({ id: n.id, weight: n.weight })),
+            edges: cleanEdges,
+            width: dimRef.current.w,
+            height: dimRef.current.h,
+          })
+        } else {
+          // Fallback: run the same layout on the main thread (UI may briefly
+          // freeze on very large graphs, but the graph still renders).
+          stopFallback = runLayout(
+            nodes as any,
+            cleanEdges as any,
+            dimRef.current.w,
+            dimRef.current.h,
+            {
+              onInit: (clusters, count) => applyMessage({ type: 'init', clusters, count }),
+              onTick: (buf) => applyMessage({ type: 'tick', buf }),
+              onDone: (buf) => applyMessage({ type: 'done', buf }),
+            },
+          )
+        }
       })
       .catch(() => setGraphError(true))
     api.graphStats().then(setStats).catch(() => setStats(null))
-  }, [minWeight, labelFilter, recomputeHulls])
+
+    return () => {
+      if (watchdog) clearTimeout(watchdog)
+      worker?.terminate()
+      stopFallback?.()
+      if (workerRef.current === worker) workerRef.current = null
+    }
+  }, [nodeLimit, labelFilter, recomputeHulls])
 
   // Responsive canvas sizing (DPR aware)
   useEffect(() => {
@@ -336,28 +377,38 @@ export function Graph() {
       canvas.style.height = h + 'px'
       dirtyRef.current = true
       // re-center + reheat simulation on resize
-      const sim = simRef.current
-      if (sim) {
-        const { w: W, h: H } = dimRef.current
-        const K = anchorRef.current.size
-        const R = Math.min(W, H) * 0.32
-        const anchors = new Map<number, { x: number; y: number }>()
-        for (let k = 0; k < K; k++) {
-          const ang = (k / Math.max(1, K)) * Math.PI * 2 - Math.PI / 2
-          anchors.set(k, { x: W / 2 + R * Math.cos(ang), y: H / 2 + R * Math.sin(ang) })
-        }
-        anchorRef.current = anchors
-        sim.force('center', forceCenter(W / 2, H / 2))
-        sim.force('x', forceX((d: any) => anchors.get((d as GraphNode).cluster)!.x).strength(0.06))
-        sim.force('y', forceY((d: any) => anchors.get((d as GraphNode).cluster)!.y).strength(0.06))
-        sim.alpha(0.12).alphaDecay(0.08).alphaMin(0.005).restart()
-      }
+      if (workerRef.current) workerRef.current.postMessage({ type: 'resize', width: w, height: h })
+      else reheat(w, h)
+      // keep the whole graph framed (unless the user has manually panned/zoomed)
+      if (!userZoomedRef.current) fitToView()
     }
     apply()
     const ro = new ResizeObserver(apply)
     ro.observe(wrap)
     return () => ro.disconnect()
   }, [graphData])
+
+  // Fit the whole graph into the viewport. More nodes => smaller scale (zoom out)
+  // so the overview always shows everything without changing the layout itself.
+  const fitToView = () => {
+    const g = graphRef.current
+    const canvas = canvasRef.current
+    const zb = zoomRef.current
+    if (!g || !canvas || !zb || g.nodes.length === 0) return
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const n of g.nodes) {
+      if (n.x < minX) minX = n.x; if (n.x > maxX) maxX = n.x
+      if (n.y < minY) minY = n.y; if (n.y > maxY) maxY = n.y
+    }
+    const { w: W, h: H } = dimRef.current
+    const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY)
+    const pad = 48
+    let k = Math.min((W - pad * 2) / bw, (H - pad * 2) / bh)
+    k = Math.max((zoomRef.current as any)?.scaleExtent?.()[0] ?? 0.2, Math.min((zoomRef.current as any)?.scaleExtent?.()[1] ?? 8, k))
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
+    const tx = W / 2 - k * cx, ty = H / 2 - k * cy
+    select(canvas).call(zb.transform, zoomIdentity.translate(tx, ty).scale(k))
+  }
 
   // Render + simulation loop (always running; cheap when settled)
   useEffect(() => {
@@ -370,7 +421,7 @@ export function Graph() {
     const zb = zoom<HTMLCanvasElement, unknown>()
       .scaleExtent([0.2, 8])
       .clickDistance(6)
-      .on('zoom', (event) => { transformRef.current = event.transform; dirtyRef.current = true })
+      .on('zoom', (event) => { transformRef.current = event.transform; if (event.sourceEvent) userZoomedRef.current = true; dirtyRef.current = true })
     zoomRef.current = zb
     const sel = select(canvas)
     sel.call(zb as any)
@@ -503,7 +554,6 @@ export function Graph() {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
       sel.on('.zoom', null)
-      simRef.current?.stop()
     }
   }, [graphData, recomputeHulls])
 
@@ -539,7 +589,7 @@ export function Graph() {
     api.entityArticles(found.id, 15)
       .then((r: any) => setSidebarArticles(r.articles ?? []))
       .catch(() => setSidebarArticles([]))
-    api.entityRelations(found.id, 20)
+    api.entityRelations(found.id, 100)
       .then((r: any) => setSidebarRelations(r.relationships ?? []))
       .catch(() => setSidebarRelations([]))
       .finally(() => setSidebarLoading(false))
@@ -565,20 +615,24 @@ export function Graph() {
   })()
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Section title="ENTITY CO-OCCURRENCE GRAPH" sub="FORCE-DIRECTED · AUTO-CLUSTERED" fill>
-        {stats && (
-          <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
-            {[{ l: 'NODES', v: stats.nodes }, { l: 'EDGES', v: stats.edges }, { l: 'TRIPLES', v: stats.triples }].map(s => (
-              <span key={s.l} style={{ fontSize: 9, letterSpacing: '0.1em' }}>
-                <span style={{ color: '#555550' }}>{s.l}: </span>
-                <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{s.v?.toLocaleString()}</span>
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 12, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 40, background: '#f5f5f0' }}>
+      {/* Floating control bar */}
+      <div style={{ position: 'absolute', top: 92, left: 12, zIndex: 6, background: 'rgba(245,245,240,0.94)', border: '1px solid #0a0a0a', boxShadow: '3px 3px 0 #0a0a0a', padding: '8px 10px', maxWidth: 'calc(100% - 24px)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexWrap: 'wrap', marginBottom: 8 }}>
+          <h2 style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', margin: 0 }}>ENTITY CO-OCCURRENCE GRAPH</h2>
+          <span style={{ fontSize: 9, color: '#555550', letterSpacing: '0.1em' }}>FORCE-DIRECTED · AUTO-CLUSTERED</span>
+          {stats && (
+            <span style={{ display: 'flex', gap: 16, fontSize: 9, letterSpacing: '0.1em' }}>
+              {[{ l: 'NODES', v: stats.nodes }, { l: 'EDGES', v: stats.edges }, { l: 'TRIPLES', v: stats.triples }].map(s => (
+                <span key={s.l}>
+                  <span style={{ color: '#555550' }}>{s.l}: </span>
+                  <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{s.v?.toLocaleString()}</span>
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', border: '1px solid #0a0a0a' }}>
             {['ALL', 'PER', 'ORG', 'LOC'].map((l, i, arr) => (
               <button key={l} onClick={() => setLabelFilter(l)}
@@ -598,9 +652,20 @@ export function Graph() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 9 }}>
-            <span style={{ color: '#555550', letterSpacing: '0.08em' }}>MIN WEIGHT</span>
-            <input type="range" min="1" max="30" value={minWeight} onChange={e => setMinWeight(Number(e.target.value))} style={{ accentColor: '#0a0a0a', width: 72 }} />
-            <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, width: 16 }}>{minWeight}</span>
+            <span style={{ color: '#555550', letterSpacing: '0.08em' }}>NODES</span>
+            <input
+              type="range"
+              min={50}
+              max={stats?.nodes ?? 6000}
+              value={nodeLimit === 0 ? (stats?.nodes ?? 6000) : nodeLimit}
+              onChange={e => {
+                const max = stats?.nodes ?? 6000
+                const v = Number(e.target.value)
+                setNodeLimit(v >= max ? 0 : v)
+              }}
+              style={{ accentColor: '#0a0a0a', width: 120 }}
+            />
+            <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, width: 42 }}>{nodeLimit === 0 ? 'ALL' : nodeLimit}</span>
           </div>
 
           {selected && (
@@ -610,58 +675,65 @@ export function Graph() {
             </button>
           )}
         </div>
+      </div>
 
-        {graphError && <EmptyState msg="COULD NOT REACH API — CHECK BACKEND CONNECTION" />}
-        {!graphData && !graphError && <SkelChartArea height={560} />}
-        <Card style={{ flex: 1, minHeight: 0, display: graphError ? 'none' : 'flex', flexDirection: 'column', padding: 0, position: 'relative' }}>
-          {graphData && (
-            <div ref={wrapRef} style={{ width: '100%', height: '100%', flex: 1, minHeight: 0 }}>
-              <canvas
-                ref={canvasRef}
-                style={{ width: '100%', height: '100%', display: 'block', cursor: hovered ? 'pointer' : 'grab' }}
-                onMouseMove={handleMouseMove}
-                onMouseLeave={() => { hoveredRef.current = null; setHovered(null); dirtyRef.current = true }}
-                onClick={handleClick}
-              />
-            </div>
-          )}
+      {/* Full-bleed canvas */}
+      <div ref={wrapRef} style={{ position: 'absolute', top: 88, left: 0, right: 0, bottom: 0 }}>
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: '100%', display: 'block', cursor: hovered ? 'pointer' : 'grab' }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => { hoveredRef.current = null; setHovered(null); dirtyRef.current = true }}
+          onClick={handleClick}
+        />
+      </div>
 
-          <div style={{
-            position: 'absolute', top: 10, left: 10,
-            background: 'rgba(245,245,240,0.92)', border: '1px solid #0a0a0a',
-            padding: '8px 10px', fontSize: 8, letterSpacing: '0.09em', maxHeight: 240, overflowY: 'auto',
-          }}>
-            <div style={{ fontWeight: 700, marginBottom: 5, letterSpacing: '0.15em' }}>SHAPE = TYPE</div>
-            <div style={{ marginBottom: 2 }}>● PERSON (PER)</div>
-            <div style={{ marginBottom: 2 }}>■ ORGANISATION (ORG)</div>
-            <div style={{ marginBottom: 5 }}>▲ LOCATION (LOC)</div>
-            <div style={{ fontWeight: 700, marginBottom: 5, letterSpacing: '0.15em', borderTop: '1px dashed #0a0a0a', paddingTop: 5 }}>
-              FILL = {COLOR_MODE_LABELS[colorMode]}
-            </div>
-            {legendEntries.map((le, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                <ColorSwatch fg={le.fg} density={le.density} />
-                <span>{le.label}</span>
-              </div>
-            ))}
-            {colorMode === 'cluster' && clusterInfoRef.current.length > 12 && (
-              <div style={{ marginTop: 3, color: '#555550' }}>+{clusterInfoRef.current.length - 12} more</div>
-            )}
+      {graphError && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <EmptyState msg="COULD NOT REACH API — CHECK BACKEND CONNECTION" />
+        </div>
+      )}
+      {!graphData && !graphError && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, letterSpacing: '0.2em', color: '#555550' }}>
+          COMPUTING LAYOUT<span className="cursor-blink">_</span>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div style={{
+        position: 'absolute', bottom: 12, left: 12, zIndex: 6,
+        background: 'rgba(245,245,240,0.92)', border: '1px solid #0a0a0a',
+        padding: '8px 10px', fontSize: 8, letterSpacing: '0.09em', maxHeight: 240, overflowY: 'auto',
+      }}>
+        <div style={{ fontWeight: 700, marginBottom: 5, letterSpacing: '0.15em' }}>SHAPE = TYPE</div>
+        <div style={{ marginBottom: 2 }}>● PERSON (PER)</div>
+        <div style={{ marginBottom: 2 }}>■ ORGANISATION (ORG)</div>
+        <div style={{ marginBottom: 5 }}>▲ LOCATION (LOC)</div>
+        <div style={{ fontWeight: 700, marginBottom: 5, letterSpacing: '0.15em', borderTop: '1px dashed #0a0a0a', paddingTop: 5 }}>
+          FILL = {COLOR_MODE_LABELS[colorMode]}
+        </div>
+        {legendEntries.map((le, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <ColorSwatch fg={le.fg} density={le.density} />
+            <span>{le.label}</span>
           </div>
+        ))}
+        {colorMode === 'cluster' && clusterInfoRef.current.length > 12 && (
+          <div style={{ marginTop: 3, color: '#555550' }}>+{clusterInfoRef.current.length - 12} more</div>
+        )}
+      </div>
 
-          {!everClicked && !hovered && (
-            <div style={{ position: 'absolute', bottom: 10, right: 10, fontSize: 8, letterSpacing: '0.12em', color: '#555550', pointerEvents: 'none' }}>
-              SCROLL = ZOOM · DRAG = PAN · CLICK A NODE ▶
-            </div>
-          )}
+      {!everClicked && !hovered && (
+        <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 6, fontSize: 8, letterSpacing: '0.12em', color: '#555550', pointerEvents: 'none', background: 'rgba(245,245,240,0.8)', padding: '4px 8px', border: '1px solid #d4d4cc' }}>
+          SCROLL = ZOOM · DRAG = PAN · CLICK A NODE ▶
+        </div>
+      )}
 
-          {hovered && (
-            <div style={{ position: 'absolute', bottom: 10, left: 10, background: '#0a0a0a', color: '#f5f5f0', fontSize: 10, padding: '5px 10px', letterSpacing: '0.08em', pointerEvents: 'none' }}>
-              {hovered.text} · {hovered.label} · {hovered.weight} co-occ. · {hovered.cluster + 1 >= 0 ? `CLUSTER ${hovered.cluster + 1}` : ''}
-            </div>
-          )}
-        </Card>
-      </Section>
+      {hovered && (
+        <div style={{ position: 'absolute', bottom: 12, right: 12, zIndex: 6, background: '#0a0a0a', color: '#f5f5f0', fontSize: 10, padding: '5px 10px', letterSpacing: '0.08em', pointerEvents: 'none' }}>
+          {hovered.text} · {hovered.label} · {hovered.weight} co-occ. · {hovered.cluster + 1 >= 0 ? `CLUSTER ${hovered.cluster + 1}` : ''}
+        </div>
+      )}
 
       {selected && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'all' }}
