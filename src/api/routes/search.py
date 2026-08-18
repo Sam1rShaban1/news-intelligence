@@ -1,6 +1,6 @@
 """Search route — PostgreSQL full-text search across articles with filters."""
 
-from datetime import date, datetime
+from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import desc, func, select
@@ -19,13 +19,23 @@ router = APIRouter(tags=["search"])
 @router.get("/search")
 def search_articles(
     q: str | None = Query(default=None, min_length=2, description="Full-text query"),
-    language: str | None = Query(default=None, description="Comma-separated languages (mk,sq,en,tr)"),
+    language: str | None = Query(
+        default=None, description="Comma-separated languages (mk,sq,en,tr)",
+    ),
     sentiment: str | None = Query(default=None, description="Comma-separated pos/neg/neutral"),
     source_id: int | None = Query(default=None, description="Filter by source id"),
-    entity: str | None = Query(default=None, description="Only articles mentioning this entity (canonical text)"),
-    predicate: str | None = Query(default=None, description="Only articles with a relationship of this predicate"),
-    date_from: date | None = Query(default=None, description="Articles discovered on/after this date"),
-    date_to: date | None = Query(default=None, description="Articles discovered on/before this date"),
+    entity: str | None = Query(
+        default=None, description="Only articles mentioning this entity (canonical text)",
+    ),
+    predicate: str | None = Query(
+        default=None, description="Only articles with a relationship of this predicate",
+    ),
+    date_from: date | None = Query(
+        default=None, description="Articles discovered on/after this date",
+    ),
+    date_to: date | None = Query(
+        default=None, description="Articles discovered on/before this date",
+    ),
     sort: str = Query(default="auto", description="rank | recent | auto"),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -113,7 +123,11 @@ def search_articles(
                 "summary": r.summary,
                 "sentiment_label": r.sentiment_label,
                 "language": r.language,
-                "rank": round(float(r.rank), 4) if q and getattr(r, "rank", None) is not None else None,
+                "rank": (
+                    round(float(r.rank), 4)
+                    if q and getattr(r, "rank", None) is not None
+                    else None
+                ),
                 "entities": ent_map.get(r.id, [])[:5],
             }
             for r in rows

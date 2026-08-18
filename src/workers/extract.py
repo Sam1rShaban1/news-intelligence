@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 # Script-based language detection for MK/SQ/TR/EN
 _RE_CYRILLIC = re.compile(r"[\u0400-\u04FF]")
-# Turkish-specific: ğ, ş, ı (dotless i), İ (capital I with dot) — not found in Western European langs
+# Turkish-specific: ğ, ş, ı (dotless i), İ (capital I with dot) — not found in
+# Western European langs
 _RE_TURKISH = re.compile(r"[ğışĞIŞ]")
 _RE_ALBANIAN = re.compile(r"[ëË]")
 

@@ -25,7 +25,6 @@ import sys
 
 from sqlalchemy import select, text
 
-from src.db.models.entity import Entity
 from src.db.models.entity_edge import EntityEdge
 from src.db.models.entity_node import EntityNode
 from src.db.session import SessionLocal

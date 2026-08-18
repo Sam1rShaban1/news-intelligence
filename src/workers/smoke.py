@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 
 from config.settings import settings
+from src.collector.fetcher import discover_articles
 from src.db.models.article import Article
 from src.db.models.entity import Entity
 from src.db.models.entity_edge import EntityEdge
@@ -31,7 +32,6 @@ from src.db.models.relationship import Relationship
 from src.db.models.source import Source
 from src.db.session import SessionLocal
 from src.workers.analyze import run_analyze_cycle
-from src.collector.fetcher import discover_articles
 from src.workers.extract import run_extract_cycle
 from src.workers.fetch import _process_source, run_fetch_cycle
 from src.workers.lifecycle import WorkerConfig
@@ -94,9 +94,10 @@ def run_smoke(
 
     fetched = _bounded_fetch(config, limit_sources)
     logger.info("Fetch: %d new articles", fetched)
-    extracted = _drain(run_extract_cycle, config, max_iterations)
-    analyzed = _drain(run_analyze_cycle, config, max_iterations)
-    ner_done = _drain(run_ner_cycle, config, max_iterations) if include_ner else 0
+    _drain(run_extract_cycle, config, max_iterations)
+    _drain(run_analyze_cycle, config, max_iterations)
+    if include_ner:
+        _drain(run_ner_cycle, config, max_iterations)
 
     with SessionLocal() as session:
         counts = {

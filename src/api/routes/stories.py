@@ -1,6 +1,7 @@
 """Stories route — event clusters derived from entity overlap (Phase 6)."""
 
 from collections import defaultdict
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
@@ -19,7 +20,9 @@ def list_stories(
     days: int = Query(default=7, ge=1, le=90, description="Window in days"),
     language: str | None = Query(default=None, description="en|mk|sq|tr|..."),
     sentiment: str | None = Query(default=None, description="pos|neg|neutral"),
-    entity: str | None = Query(default=None, description="Filter by canonical entity text (substring)"),
+    entity: str | None = Query(
+        default=None, description="Filter by canonical entity text (substring)",
+    ),
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> dict:

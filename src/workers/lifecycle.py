@@ -2,7 +2,7 @@
 
 import logging
 import signal
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from threading import Event
 
 logger = logging.getLogger(__name__)

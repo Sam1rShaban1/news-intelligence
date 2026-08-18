@@ -1,6 +1,6 @@
 """Tests for entity normalization (knowledge-graph dedup)."""
 
-from src.nlp.normalize import normalize_entity, normalize_entities
+from src.nlp.normalize import normalize_entities, normalize_entity
 
 
 def test_macedonian_cyrillic_folds_to_latin():

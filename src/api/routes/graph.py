@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import desc, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from src.api.deps import get_db
 from src.db.models.entity_edge import EntityEdge
@@ -10,8 +10,6 @@ from src.db.models.entity_node import EntityNode
 from src.db.models.relationship import Relationship
 
 router = APIRouter(tags=["graph"])
-
-from sqlalchemy.orm import aliased
 
 NodeA = aliased(EntityNode)
 NodeB = aliased(EntityNode)
@@ -21,9 +19,15 @@ Obj = aliased(EntityNode)
 
 @router.get("/graph/cooccurrence")
 def graph_cooccurrence(
-    node_limit: int = Query(default=0, ge=0, le=10000, description="Restrict to the top-N entities by mention count (0 = all nodes)"),
+    node_limit: int = Query(
+        default=0, ge=0, le=10000,
+        description="Restrict to the top-N entities by mention count (0 = all nodes)",
+    ),
     min_weight: int = Query(default=1, ge=1),
-    limit: int = Query(default=200000, ge=1, le=200000, description="Safety cap on number of returned edges"),
+    limit: int = Query(
+        default=200000, ge=1, le=200000,
+        description="Safety cap on number of returned edges",
+    ),
     label: str | None = Query(default=None, description="Restrict to edges touching this label"),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -112,7 +116,9 @@ def graph_stats(db: Session = Depends(get_db)) -> dict:
 @router.get("/graph/relationships")
 def graph_relationships(
     predicate: str | None = Query(default=None, description="Filter by predicate (e.g. appointed)"),
-    label: str | None = Query(default=None, description="Restrict to triples touching this entity label"),
+    label: str | None = Query(
+        default=None, description="Restrict to triples touching this entity label",
+    ),
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
 ) -> dict:

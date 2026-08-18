@@ -5,11 +5,11 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 from config.settings import settings
+from src.scheduler.scheduler import run_scheduler
 from src.workers.analyze import run_analyze_worker_loop
 from src.workers.extract import run_extract_worker_loop
 from src.workers.fetch import run_fetch_worker_loop
 from src.workers.lifecycle import WorkerConfig, install_signal_handlers, is_shutdown_requested
-from src.scheduler.scheduler import run_scheduler
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),

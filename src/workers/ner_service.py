@@ -84,7 +84,9 @@ def run_ner_cycle(config: WorkerConfig) -> int:
 
                 if article.retry_count >= config.max_retries:
                     article.status = "failed"
-                    logger.warning("NER failed after %d retries: %s", article.retry_count, article.url)
+                    logger.warning(
+                        "NER failed after %d retries: %s", article.retry_count, article.url
+                    )
                 else:
                     article.status = "sentiment_done"  # reset for retry
                     article.started_at = None

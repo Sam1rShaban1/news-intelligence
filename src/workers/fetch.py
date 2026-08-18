@@ -4,10 +4,8 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select, update
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import select
 
-from config.settings import settings
 from src.collector.dedup import compute_url_hash
 from src.collector.fetcher import discover_articles
 from src.db.models.article import Article

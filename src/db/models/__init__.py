@@ -1,12 +1,12 @@
 """Re-export all models for Alembic and session imports."""
 
-from .base import Base, TimestampMixin
-from .source import Source
 from .article import Article
+from .base import Base, TimestampMixin
 from .entity import Entity
-from .entity_node import EntityNode
 from .entity_edge import EntityEdge
+from .entity_node import EntityNode
 from .relationship import Relationship
+from .source import Source
 from .story import Story, story_articles
 
 __all__ = [

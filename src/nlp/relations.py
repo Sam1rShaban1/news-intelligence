@@ -16,7 +16,6 @@ from itertools import combinations
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from src.db.models.entity import Entity
 from src.db.models.entity_node import EntityNode
 from src.db.models.relationship import Relationship
 from src.nlp.normalize import normalize_entity, normalize_text

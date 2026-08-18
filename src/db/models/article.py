@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -90,7 +89,7 @@ class Article(Base, TimestampMixin):
 
     # Relationships
     source: Mapped["Source"] = relationship(back_populates="articles")
-    entities: Mapped[list["Entity"]] = relationship(
+    entities: Mapped[list["Entity"]] = relationship(  # noqa: F821
         back_populates="article", cascade="all, delete-orphan"
     )
     stories: Mapped[list["Story"]] = relationship(

@@ -141,7 +141,10 @@ def _scrape_homepage(source_url: str) -> list[dict[str, Any]]:
         path = href.split(source_url)[-1] if source_url in href else href
         if len(path) < 10:
             continue
-        if any(skip in href.lower() for skip in ("/tag/", "/author/", "/page/", ".jpg", ".png", "#")):
+        if any(
+            skip in href.lower()
+            for skip in ("/tag/", "/author/", "/page/", ".jpg", ".png", "#")
+        ):
             continue
 
         if href not in seen:

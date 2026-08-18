@@ -1,7 +1,5 @@
 """Seed sources from config/sources.yml into the database."""
 
-import sys
-from pathlib import Path
 
 import yaml
 from sqlalchemy import select
