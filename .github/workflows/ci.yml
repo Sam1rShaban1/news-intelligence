@@ -8,6 +8,22 @@ on:
 jobs:
   lint-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: news
+          POSTGRES_PASSWORD: news
+          POSTGRES_DB: news_intelligence
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U news"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NEWS_DATABASE_URL: postgresql://news:news@localhost:5432/news_intelligence
     steps:
       - name: Checkout
         uses: actions/checkout@v4

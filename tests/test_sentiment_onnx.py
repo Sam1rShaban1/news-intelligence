@@ -1,7 +1,21 @@
 """Tests for multilingual ONNX sentiment integration + lexicon/VADER fallback."""
 
+import os
+
+import pytest
+
+from config.settings import settings
 from src.nlp.sentiment import analyze_sentiment
 from src.nlp.sentiment_onnx import transformer_sentiment
+
+# These tests exercise the lexicon / VADER fallback path, which is only taken when the
+# ONNX model is absent. Skip them where the model is baked in (e.g. the CI image).
+_ONNX_PRESENT = os.path.exists(settings.sentiment_model_path) and os.path.exists(
+    os.path.join(os.path.dirname(settings.sentiment_model_path), "sentiment_tokenizer.json")
+)
+pytestmark = pytest.mark.skipif(
+    _ONNX_PRESENT, reason="ONNX model present; fallback path not exercised"
+)
 
 
 def test_transformer_missing_returns_none():

@@ -1,8 +1,22 @@
 """Tests for multilingual sentiment (Phase 4 lexicon)."""
 
+import os
+
+import pytest
+
+from config.settings import settings
 from src.nlp.lexicon import lexicon_sentiment
 from src.nlp.normalize import normalize_text
 from src.nlp.sentiment import analyze_sentiment
+
+# These tests exercise the lexicon / VADER fallback path, which is only taken when the
+# ONNX model is absent. Skip them where the model is baked in (e.g. the CI image).
+_ONNX_PRESENT = os.path.exists(settings.sentiment_model_path) and os.path.exists(
+    os.path.join(os.path.dirname(settings.sentiment_model_path), "sentiment_tokenizer.json")
+)
+pytestmark = pytest.mark.skipif(
+    _ONNX_PRESENT, reason="ONNX model present; fallback path not exercised"
+)
 
 
 def test_lexicon_mk_negative():
