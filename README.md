@@ -24,7 +24,7 @@ containerised with Docker Compose.
   edges, extracts relationship triples, and clusters articles into **stories** (events).
 - **Full-text search** — lexical search over article text with cross-script support
   (Macedonian Cyrillic is transliterated to Latin so a Latin query finds Cyrillic articles).
-- **Analytics & dashboards** — REST API + a Streamlit UI with pipeline status, search &
+- **Analytics & frontend** — REST API + a React frontend with pipeline status, search &
   trends, sentiment distribution, top entities, an interactive entity graph, and a stories
   view.
 
@@ -72,10 +72,10 @@ new → fetched → extracted → sentiment_done → analyzed
  GLiNER2 ──→│ ner      │ ───────────────────────────→│  entities /  │
             └──────────┘                              │  graph /     │
                                                       │  stories     │
-            ┌──────────┐   read APIs                   └──────┬───────┘
- Dashboards─│ dashboard│ ────────────────────────────────────┘
+             ┌──────────┐   read APIs                   └──────┬───────┘
+ Frontend──│frontend│ ────────────────────────────────────┘
  & API ────→│ web(API) │
-            └──────────┘
+             └──────────┘
 ```
 
 ---
@@ -84,7 +84,7 @@ new → fetched → extracted → sentiment_done → analyzed
 
 - **Language / runtime:** Python 3.12 (slim).
 - **Web framework:** FastAPI + Uvicorn.
-- **Frontend:** React 19 + Vite + Tailwind CSS v4 (SPA, served by nginx); interactive knowledge-graph via the bundled chart kit. Talks to the API through an nginx reverse proxy at `/api`.
+- **Frontend:** React 19 + Vite + Tailwind CSS v4 (SPA, served by nginx); interactive knowledge-graph rendered on a custom `<canvas>` with `d3-force` + `d3-zoom` (layout runs in a web worker). Talks to the API through an nginx reverse proxy at `/api`.
 - **ORM / migrations:** SQLAlchemy 2.x + Alembic.
 - **Database:** PostgreSQL 16 with `pgvector` (for future embedding use) and built-in
   full-text search.
@@ -100,6 +100,36 @@ new → fetched → extracted → sentiment_done → analyzed
 > *single* string (no native batching). NER throughput therefore comes from bulk DB
 > writes, a larger `batch_size`, ONNX thread tuning, and incremental story assignment
 > — not from model-level batching.
+
+---
+
+## Third-party models & attribution
+
+This project bundles and depends on open-source models and libraries. Their
+respective licenses apply; see the `LICENSE` (Apache-2.0) and `NOTICE` files for
+the full attribution.
+
+**Machine-learning models**
+
+| Component | Use | Source | License |
+|-----------|-----|--------|---------|
+| **GLiNER2** (`lmo3/gliner2-multi-v1-onnx`) | Multilingual NER (ONNX) | [huggingface.co/lmo3/gliner2-multi-v1-onnx](https://huggingface.co/lmo3/gliner2-multi-v1-onnx) | Apache-2.0 |
+| **XLM-RoBERTa sentiment** (`onnx-community/twitter-xlm-roberta-base-sentiment-ONNX`, int8) | Per-article sentiment (ONNX) | [huggingface.co/onnx-community/twitter-xlm-roberta-base-sentiment-ONNX](https://huggingface.co/onnx-community/twitter-xlm-roberta-base-sentiment-ONNX) | MIT* |
+| **VADER** (`vaderSentiment`) | Lexicon sentiment fallback | [github.com/cjhutto/vaderSentiment](https://github.com/cjhutto/vaderSentiment) | MIT |
+
+\* Derived from `cardiffnlp/twitter-xlm-roberta-base-sentiment`, built on XLM-RoBERTa
+(Meta, MIT).
+
+**Key libraries**
+
+- **Backend:** ONNX Runtime (MIT), FastAPI / Uvicorn / Pydantic (MIT), SQLAlchemy +
+  Alembic (MIT), `newspaper4k` (MIT), `feedparser` (BSD), APScheduler (MIT),
+  `pgvector` (Apache-2.0), `psycopg2` (LGPL-3.0).
+- **Frontend:** React / React DOM / Vite / Tailwind CSS (MIT), `d3-force` / `d3-zoom`
+  / `d3-selection` (BSD-3-Clause), `louvain` / js-louvain (MIT).
+
+If you redistribute this software, retain the `NOTICE` file and the attributions
+above.
 
 ---
 
@@ -214,7 +244,7 @@ curl -s "http://localhost:8000/search?q=skopje" | head
 ## Web frontend (`frontend`, port 8501)
 
 A lightweight React 19 + Vite + Tailwind CSS v4 single-page app, built to a static bundle
-and served by nginx. It is the primary UI, replacing the old Streamlit dashboard. nginx
+and served by nginx. It is the primary UI, replacing the previous Streamlit-based dashboard. nginx
 proxies `/api/*` to the `web` (FastAPI) service, so the browser only ever talks to one
 origin.
 
@@ -238,6 +268,10 @@ built and run automatically by `docker compose up`.
 ---
 
 ## Configuration
+
+All services are configured through `NEWS_*` environment variables (loaded by
+`config/settings.py`, with overrides from a local `.env` file). A ready-to-copy
+template is provided in [`.env.example`](.env.example).
 
 ### Environment variables (`NEWS_*` prefix, see `config/settings.py`)
 
@@ -345,7 +379,7 @@ docker compose up -d
 
 ## Operations
 
-- **Logs:** `docker compose logs -f <service>` (`worker | ner | web | dashboard`).
+- **Logs:** `docker compose logs -f <service>` (`worker | ner | web | frontend`).
 - **Restart one service:** `docker compose restart ner`.
 - **Stop (keeps data):** `docker compose down` — the `pgdata` and `hf_cache` volumes
   persist.
@@ -419,15 +453,15 @@ Optional env: `NEWS_SMOKE_SOURCES=<n>`, `NEWS_SMOKE_ITERS=<n>`.
 ```
 .
 ├── Dockerfile                 # single image for all services
-├── docker-compose.yml         # postgres, migrate, seed, worker, ner, web, dashboard
+├── docker-compose.yml         # postgres, migrate, seed, worker, ner, web, frontend
 ├── config/
 │   ├── settings.py            # NEWS_* env configuration
 │   └── sources.yml            # RSS feed list (per language)
 ├── alembic/                   # DB migrations (001–007)
+├── ui/                       # React + Vite + Tailwind frontend (SPA), served by nginx
 ├── src/
 │   ├── api/                   # FastAPI app + routes (articles, search, analytics,
 │   │                         #   entities, sentiment, graph, stories)
-│   ├── dashboard/             # Streamlit UI
 │   ├── db/                    # SQLAlchemy models + session
 │   ├── nlp/                   # normalize, ner, graph, relations, stories, sentiment_onnx
 │   └── workers/               # fetch/extract/sentiment loop + ner_service + lifecycle
