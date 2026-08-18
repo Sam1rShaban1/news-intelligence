@@ -150,6 +150,7 @@ export function Graph() {
   const [sidebarArticles, setSidebarArticles] = useState<any[]>([])
   const [sidebarRelations, setSidebarRelations] = useState<any[]>([])
   const [sidebarLoading, setSidebarLoading] = useState(false)
+  const [nodeDetail, setNodeDetail] = useState<any | null>(null)
   const [focusId, setFocusId] = useState<string | null>(null)
   const [, setLayoutTick] = useState(0)
 
@@ -585,7 +586,7 @@ export function Graph() {
     const found = hitTest(e)
     if (!found) return
     selectedRef.current = found; setSelected(found); setEverClicked(true)
-    setSidebarArticles([]); setSidebarRelations([]); setSidebarLoading(true)
+    setSidebarArticles([]); setSidebarRelations([]); setSidebarLoading(true); setNodeDetail(null)
     api.entityArticles(found.id, 15)
       .then((r: any) => setSidebarArticles(r.articles ?? []))
       .catch(() => setSidebarArticles([]))
@@ -593,6 +594,9 @@ export function Graph() {
       .then((r: any) => setSidebarRelations(r.relationships ?? []))
       .catch(() => setSidebarRelations([]))
       .finally(() => setSidebarLoading(false))
+    api.entityNode(found.id)
+      .then((r: any) => setNodeDetail(r ?? null))
+      .catch(() => setNodeDetail(null))
   }, [hitTest])
 
   const legendEntries: { label: string; fg: Rgb; density: number }[] = (() => {
@@ -737,7 +741,7 @@ export function Graph() {
 
       {selected && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'all' }}
-          onClick={() => setSelected(null)}>
+          onClick={() => { setSelected(null); setNodeDetail(null) }}>
           <div style={{ width: '100%', maxWidth: 400, height: '100%', background: '#f5f5f0', borderLeft: '2px solid #0a0a0a', boxShadow: '-5px 0 0 #0a0a0a', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: '2px solid #0a0a0a', display: 'flex', alignItems: 'flex-start', gap: 10, background: '#0a0a0a', color: '#f5f5f0', flexShrink: 0 }}>
@@ -749,8 +753,23 @@ export function Graph() {
                 <div style={{ fontSize: 9, opacity: 0.6, marginTop: 5, letterSpacing: '0.06em' }}>
                   {selected.weight} CO-OCCURRENCES · CLUSTER {selected.cluster + 1} · CLICK OUTSIDE TO CLOSE
                 </div>
+                {nodeDetail?.description && (
+                  <div style={{ fontSize: 10, marginTop: 6, lineHeight: 1.35, opacity: 0.85 }}>
+                    {nodeDetail.description}
+                  </div>
+                )}
+                {nodeDetail?.wikidata_url && (
+                  <a
+                    href={nodeDetail.wikidata_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 9, marginTop: 6, letterSpacing: '0.08em', color: '#f5f5f0', textDecoration: 'underline' }}
+                  >
+                    VIEW ON WIKIDATA ↗
+                  </a>
+                )}
               </div>
-              <button onClick={() => setSelected(null)} style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', color: '#f5f5f0', padding: 2, lineHeight: 1, flexShrink: 0 }}>×</button>
+               <button onClick={() => { setSelected(null); setNodeDetail(null) }} style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', color: '#f5f5f0', padding: 2, lineHeight: 1, flexShrink: 0 }}>×</button>
             </div>
 
             <div style={{ padding: '8px 16px', borderBottom: '1px solid #d4d4cc', fontSize: 8, letterSpacing: '0.14em', color: '#555550', background: '#efefea', flexShrink: 0 }}>

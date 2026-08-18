@@ -25,6 +25,7 @@ export const api = {
     get<any>('/entities/nodes', opts),
   entityArticles: (id: string, limit = 10) => get<any>(`/entities/${id}/articles`, { limit }),
   entityRelations: (id: string, limit = 20) => get<any>(`/entities/${id}/relationships`, { limit }),
+  entityNode: (id: string) => get<any>(`/entities/nodes/${id}`),
   graphCooccurrence: (opts?: { node_limit?: number; limit?: number; min_weight?: number; label?: string }) =>
     get<any>('/graph/cooccurrence', opts as any),
   graphStats: () => get<any>('/graph/stats'),

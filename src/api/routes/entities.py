@@ -1,6 +1,6 @@
 """Entities route — search and browse extracted named entities + canonical nodes."""
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,31 @@ from src.db.models.entity_node import EntityNode
 from src.db.models.source import Source
 
 router = APIRouter(tags=["entities"])
+
+
+@router.get("/entities/nodes/{node_id}")
+def get_entity_node(
+    node_id: int = Path(..., description="EntityNode id"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Canonical entity node details, including any Wikidata link."""
+    node = db.get(EntityNode, node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="entity node not found")
+    return {
+        "id": node.id,
+        "canonical_text": node.canonical_text,
+        "label": node.label,
+        "mention_count": node.mention_count,
+        "wikidata_id": node.wikidata_id,
+        "description": node.description,
+        "external_ids": node.external_ids,
+        "wikidata_url": (
+            f"https://www.wikidata.org/wiki/{node.wikidata_id}"
+            if node.wikidata_id
+            else None
+        ),
+    }
 
 
 @router.get("/entities")
