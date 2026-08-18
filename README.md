@@ -265,6 +265,19 @@ before ingestion has produced anything.
 The app source lives in `ui/` (`Dockerfile`, `nginx.conf`, `vite.config.ts`, `src/`). It is
 built and run automatically by `docker compose up`.
 
+## Screenshots
+
+> Capture them with the stack running locally (`docker compose up`) and drop the PNGs into
+> `docs/screenshots/`, then update the paths below. They are referenced from this section.
+
+| View      | File |
+| --------- | ---- |
+| Overview  | `docs/screenshots/overview.png` |
+| Explore   | `docs/screenshots/explore.png` |
+| Entities  | `docs/screenshots/entities.png` |
+| Graph     | `docs/screenshots/graph.png` |
+| Stories   | `docs/screenshots/stories.png` |
+
 ---
 
 ## Configuration
@@ -422,8 +435,11 @@ Optional env: `NEWS_SMOKE_SOURCES=<n>`, `NEWS_SMOKE_ITERS=<n>`.
   multilingual sentence embedder (`paraphrase-multilingual-MiniLM-L12-v2`) scores this
   pair only ~0.53 and risks new false merges for Balkan geography, and that co-occurrence
   merging is unsafe (it fused unrelated entities). The robust fix is **entity linking to a
-  Knowledge Base** (Wikidata/DBpedia) or a curated seed-alignment set — both out of scope
-  for the current low-resource deployment. Inflectional / near-spelling variants
+  Knowledge Base**. Wikidata linking is now available as an optional step
+  (`scripts/link_wikidata.py`, also wired into the worker scheduler every 30 min) and
+  cross-lingual synonyms that resolve to the same Q-id can be merged with
+  `scripts/merge_by_wikidata.py`; a curated seed-alignment set remains an alternative.
+  Inflectional / near-spelling variants
   (`shkup`/`shkupi`/`shkupit`, `macedonia`/`maqedonia`, `kosova`/`kosovo`) *are* merged
   by the similarity backfill.
 - **NER recall varies** by language; the graph is only as rich as what GLiNER2 extracts.
