@@ -1,0 +1,38 @@
+News Intelligence
+Copyright 2026 News Intelligence contributors
+
+This product includes or depends on the following third-party open-source
+components. Their respective licenses apply to those components and are
+available from the links below.
+
+Machine-learning models
+-----------------------
+- GLiNER2 (multilingual NER, ONNX)
+  Repo: https://huggingface.co/lmo3/gliner2-multi-v1-onnx
+  Author: knowledgator
+  License: Apache-2.0
+
+- XLM-RoBERTa sentiment (int8 ONNX)
+  Repo: https://huggingface.co/onnx-community/twitter-xlm-roberta-base-sentiment-ONNX
+  Derived from cardiffnlp/twitter-xlm-roberta-base-sentiment,
+  built on XLM-RoBERTa (Meta).
+  License: MIT
+
+- VADER sentiment lexicon (vaderSentiment)
+  Author: Clayton Hutto & Eric Gilbert
+  License: MIT
+
+Backend libraries
+-----------------
+- ONNX Runtime (Microsoft) — MIT
+- FastAPI, SQLAlchemy, Alembic, Pydantic, Uvicorn, HTTPX,
+  feedparser, newspaper4k, APScheduler, pgvector, psycopg2 — see
+  respective upstream licenses (mostly MIT/BSD).
+
+Frontend libraries
+------------------
+- React, React DOM, Vite, Tailwind CSS — MIT
+- d3-force, d3-zoom, d3-selection — BSD-3-Clause
+- louvain (js-louvain, community detection) — MIT
+
+The full text of the Apache License 2.0 is provided in the LICENSE file.
