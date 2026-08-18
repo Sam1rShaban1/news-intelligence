@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     Integer,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -28,6 +29,11 @@ class EntityNode(Base, TimestampMixin):
     label: Mapped[str] = mapped_column(String(20), nullable=False)
     aliases: Mapped[list | None] = mapped_column(JSON, nullable=True)
     mention_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Wikidata entity linking (see src/nlp/wikidata.py). `external_ids` carries
+    # resolved identifiers, e.g. {"wikidata": "Q123", "wikipedia": "..."}.
+    wikidata_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_ids: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     first_seen: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

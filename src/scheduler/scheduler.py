@@ -8,6 +8,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from config.settings import settings
 from src.workers.fetch import run_fetch_cycle
 from src.workers.lifecycle import WorkerConfig, is_shutdown_requested
+from src.workers.link_wikidata import run_link_wikidata
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +23,19 @@ def _scheduled_fetch() -> None:
         logger.error("Scheduled fetch failed: %s", e, exc_info=True)
 
 
+def _scheduled_link() -> None:
+    """Periodically resolve unlinked entities to Wikidata (non-fatal)."""
+    try:
+        run_link_wikidata()
+    except Exception as e:
+        logger.error("Scheduled Wikidata linking failed: %s", e, exc_info=True)
+
+
 def run_scheduler(config: WorkerConfig | None = None) -> None:
     """
     Start APScheduler and run until shutdown.
     On startup, does an immediate fetch. Then repeats every `scan_interval_minutes`.
+    Wikidata entity linking runs on a slower cadence.
     """
     config = config or WorkerConfig()
 
@@ -45,9 +55,16 @@ def run_scheduler(config: WorkerConfig | None = None) -> None:
         id="periodic_fetch",
         replace_existing=True,
     )
+    scheduler.add_job(
+        _scheduled_link,
+        trigger=IntervalTrigger(minutes=30),
+        id="periodic_wikidata_link",
+        replace_existing=True,
+    )
     scheduler.start()
     logger.info(
-        "Scheduler started — fetching every %d minutes", settings.scan_interval_minutes
+        "Scheduler started — fetching every %d minutes, Wikidata linking every 30 minutes",
+        settings.scan_interval_minutes,
     )
 
     # Block until shutdown
