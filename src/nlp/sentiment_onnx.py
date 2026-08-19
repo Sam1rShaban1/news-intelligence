@@ -54,6 +54,12 @@ def _load() -> tuple:
             model_path, sess_options=so, providers=["CPUExecutionProvider"]
         )
         _tokenizer = Tokenizer.from_file(tok_path)
+        # Truncation is configured on the tokenizer object, not per encode() call
+        # (the `tokenizers` API rejects max_length/truncation kwargs on encode).
+        try:
+            _tokenizer.enable_truncation(max_length=512)
+        except Exception:  # already configured / unsupported — non-fatal
+            pass
     except Exception as e:  # pragma: no cover - environment dependent
         logger.warning("Failed to load sentiment ONNX model: %s", e)
         _session, _tokenizer = None, None
@@ -67,9 +73,7 @@ def transformer_sentiment(text: str) -> dict | None:
         return None
 
     try:
-        enc = tokenizer.encode(
-            text, max_length=512, truncation=True, add_special_tokens=True
-        )
+        enc = tokenizer.encode(text, add_special_tokens=True)
         feeds = {}
         for inp in session.get_inputs():
             name = inp.name.lower()
