@@ -136,9 +136,12 @@ above.
 ## NLP / ML pipeline (in detail)
 
 ### 1. Fetch (`src/workers/fetch.py`)
-The worker polls enabled sources from `config/sources.yml`, discovers article URLs
+The worker polls enabled, non-deleted sources, discovers article URLs
 (parallelised with a `ThreadPoolExecutor`), downloads and extracts clean text with
-`newspaper4k`, and stores `Article` rows. Language is detected per article.
+`newspaper4k`, and stores `Article` rows. Language is detected per article. Sources are
+managed from the **Sources** UI (add / enable / disable / soft-delete / test a feed);
+`config/sources.yml` is only the initial seed. User-supplied feed URLs are validated by an
+SSRF guard that blocks non-http(s) and internal/loopback addresses.
 
 ### 2. Extract + Sentiment (`src/workers/extract.py`, `src/nlp/sentiment_onnx.py`)
 - **Full-text index** is built here: `article.search_vector = to_tsvector('simple',
@@ -318,8 +321,11 @@ List of feeds, grouped by language. Each entry:
   enabled: true        # set false to disable without deleting
 ```
 
-The `seed` service loads this on first start. Disable a misbehaving feed by setting
-`enabled: false` and restarting (or re-running the seed job).
+The `seed` service loads this on first start as the initial source set. Once running,
+manage sources from the **Sources** tab in the UI: add new feeds, toggle `enabled`, run a
+live feed test, or soft-delete a source (stops fetching and hides it, but keeps its
+historical articles). Soft-deleted sources can be restored via the API
+(`PATCH /sources/{id}` with `enabled: true` and `deleted: false`).
 
 ---
 
@@ -336,6 +342,8 @@ SQLAlchemy models under `src/db/models/`. Alembic migrations under `alembic/vers
 | 005 | stories | `stories`, `story_articles` (event clusters). |
 | 006 | performance_indexes | GIN index on `stories.entity_node_ids`; B-tree on `entity_nodes(label, mention_count DESC)`, `entity_edges(weight DESC)`, `articles(language)`, `articles(sentiment_label)`, `stories(language)`, `stories(dominant_sentiment)` — keeps the API/graph fast. |
 | 007 | fts_fix | drops the old `search_vector` PL/pgSQL trigger; FTS is now Python-owned (`to_tsvector('simple', normalize_text(...))`). |
+| 008 | entity_wikidata | `entity_nodes` external-id columns (`wikidata_id`, `wikipedia_url`, `description`, `merge_target_id`) for entity resolution. |
+| 009 | source_deleted | `sources.deleted` soft-delete flag + indexes on `enabled`/`deleted`. |
 
 The `migrate` service runs `alembic upgrade head` automatically at startup (and
 `worker`/`ner` wait for it), so no manual migration step is needed.
