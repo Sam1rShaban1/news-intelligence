@@ -20,6 +20,7 @@ class Source(Base, TimestampMixin):
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     rss_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Tracking
     last_scanned_at: Mapped[datetime | None] = mapped_column(
