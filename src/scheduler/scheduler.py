@@ -9,6 +9,7 @@ from config.settings import settings
 from src.workers.fetch import run_fetch_cycle
 from src.workers.lifecycle import WorkerConfig, is_shutdown_requested
 from src.workers.link_wikidata import run_link_wikidata
+from src.workers.merge_wikidata import run_merge_wikidata
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,14 @@ def _scheduled_fetch() -> None:
 def _scheduled_link() -> None:
     """Periodically resolve unlinked entities to Wikidata (non-fatal)."""
     try:
-        run_link_wikidata()
+        linked = run_link_wikidata()
+        logger.info("Scheduled Wikidata linking done: %d linked", linked)
+        # Collapse nodes that now share a Q-id (e.g. shkup / skopje) so the graph
+        # reflects one entity instead of two synonyms.
+        merged = run_merge_wikidata()
+        logger.info("Scheduled Wikidata merge done: %d groups merged", merged)
     except Exception as e:
-        logger.error("Scheduled Wikidata linking failed: %s", e, exc_info=True)
+        logger.error("Scheduled Wikidata linking/merge failed: %s", e, exc_info=True)
 
 
 def run_scheduler(config: WorkerConfig | None = None) -> None:
