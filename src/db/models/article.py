@@ -34,7 +34,9 @@ class Article(Base, TimestampMixin):
         Index("idx_articles_source", "source_id"),
         Index("idx_articles_pubdate", "published_date"),
         Index("idx_articles_search", "search_vector", postgresql_using="gin"),
-        CheckConstraint("status IN ('new','fetched','extracted','analyzed','failed')"),
+        CheckConstraint(
+            "status IN ('new','fetched','extracted','analyzed','sentiment_done','failed')"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
