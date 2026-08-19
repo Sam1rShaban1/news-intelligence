@@ -113,9 +113,9 @@ export function Overview({ search: _search }: { search: string }) {
                 <YAxis />
                 <Tooltip labelKey="date" />
                 <Legend />
+                <Area dataKey="negative" variant="solid" />
                 <Area dataKey="positive" variant="hatched" />
                 <Area dataKey="neutral" variant="dotted" />
-                <Area dataKey="negative" variant="solid" />
               </AreaChart>
             )}
           </Card>
