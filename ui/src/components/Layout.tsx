@@ -244,7 +244,8 @@ export function SentimentChip({ label }: { label: string }) {
   )
 }
 
-export function LangBadge({ lang }: { lang: string }) {
+export function LangBadge({ lang }: { lang?: string | null }) {
+  if (!lang) return null
   return (
     <span
       style={{

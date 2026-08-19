@@ -1,7 +1,6 @@
 """Extract worker — fetches article content from discovered URLs."""
 
 import logging
-import re
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select, text
@@ -9,47 +8,12 @@ from sqlalchemy import func, select, text
 from src.collector.extractor import extract_article
 from src.db.models.article import Article
 from src.db.session import SessionLocal
+from src.nlp.language import detect_language
 from src.nlp.normalize import normalize_text
 from src.nlp.summarize import extractive_summary
 from src.workers.lifecycle import WorkerConfig, is_shutdown_requested
 
 logger = logging.getLogger(__name__)
-
-# Script-based language detection for MK/SQ/TR/EN
-_RE_CYRILLIC = re.compile(r"[\u0400-\u04FF]")
-# Turkish-specific: ğ, ş, ı (dotless i), İ (capital I with dot) — not found in
-# Western European langs
-_RE_TURKISH = re.compile(r"[ğışĞIŞ]")
-_RE_ALBANIAN = re.compile(r"[ëË]")
-
-# Languages we actively support; anything else falls back to English.
-_SUPPORTED = {"mk", "sq", "tr", "en"}
-
-
-def detect_language(text: str | None) -> str:
-    """Detect language: mk, tr, sq, en.
-
-    High-precision script cues win first (Cyrillic -> Macedonian; Turkish/Albanian
-    diacritics -> tr/sq). For the remaining Latin-script text — including Albanian or
-    Turkish written without those diacritics, which the old script-only detector
-    mislabeled as English — a lightweight `langid` classifier resolves the language.
-    Unsupported classifier results fall back to English.
-    """
-    if not text:
-        return "en"
-    if _RE_CYRILLIC.search(text):
-        return "mk"
-    if _RE_TURKISH.search(text):
-        return "tr"
-    if _RE_ALBANIAN.search(text):
-        return "sq"
-    try:
-        from langid import classify
-
-        lang, _ = classify(text)
-    except Exception:  # langid unavailable — leave as English
-        return "en"
-    return lang if lang in _SUPPORTED else "en"
 
 
 def claim_articles(session, batch_size: int, zombie_timeout_minutes: int) -> list[Article]:

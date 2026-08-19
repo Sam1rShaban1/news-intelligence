@@ -11,6 +11,7 @@ from src.collector.fetcher import discover_articles
 from src.db.models.article import Article
 from src.db.models.source import Source
 from src.db.session import SessionLocal
+from src.nlp.language import detect_language
 from src.workers.lifecycle import WorkerConfig, is_shutdown_requested
 
 logger = logging.getLogger(__name__)
@@ -94,6 +95,7 @@ def _process_source(session, source: Source, entries: list[dict]) -> int:
             author=entry.get("author"),
             published_date=entry.get("published_date"),
             summary=entry.get("summary"),
+            language=detect_language(entry.get("title")),
             status="new",
         )
         session.add(article)
