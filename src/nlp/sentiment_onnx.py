@@ -67,7 +67,9 @@ def transformer_sentiment(text: str) -> dict | None:
         return None
 
     try:
-        enc = tokenizer.encode(text[:512])
+        enc = tokenizer.encode(
+            text, max_length=512, truncation=True, add_special_tokens=True
+        )
         feeds = {}
         for inp in session.get_inputs():
             name = inp.name.lower()
