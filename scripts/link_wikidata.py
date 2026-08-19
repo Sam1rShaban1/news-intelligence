@@ -1,4 +1,4 @@
-#!/usr/env python
+#!/usr/bin/env python
 """Link canonical entity nodes to Wikidata.
 
 Resolves `entity_nodes` with no `wikidata_id` to a Wikidata Q-id (and stores a
@@ -14,6 +14,7 @@ It is also invoked periodically by the worker scheduler.
 
 import logging
 import os
+import time
 
 from sqlalchemy import select
 
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 LINK_BATCH = int(os.environ.get("WIKIDATA_BATCH", "200"))
 MIN_MENTIONS = int(os.environ.get("WIKIDATA_MIN_MENTIONS", "1"))
+LINK_DELAY = float(os.environ.get("WIKIDATA_DELAY", "0.15"))
 DRY_RUN = os.environ.get("DRY_RUN") == "1"
 
 
@@ -57,6 +59,7 @@ def link_pending(
             logger.info(
                 "linked %s/%s -> %s", node.label, node.canonical_text, res["wikidata_id"]
             )
+            time.sleep(LINK_DELAY)
         if not dry_run:
             db.commit()
         logger.info(
