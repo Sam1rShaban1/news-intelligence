@@ -17,7 +17,11 @@ from src.db.models.story import Story, story_articles
 logger = logging.getLogger(__name__)
 
 STORY_WINDOW_DAYS = 7
-STORY_JACCARD_THRESHOLD = 0.3
+STORY_JACCARD_THRESHOLD = 0.5
+# Require at least this many shared canonical entities, otherwise two articles that
+# merely overlap on a single entity (Jaccard can still be high for tiny sets) are kept
+# as separate stories.
+STORY_MIN_SHARED_ENTITIES = 2
 
 
 def article_entity_ids(session, article_id: int) -> set[int]:
@@ -40,18 +44,28 @@ def score_match(art_ids: set[int], story_ids: set[int]) -> float:
 
 
 def select_story(
-    art_ids: set[int], candidates: list[Story], threshold: float
+    art_ids: set[int],
+    candidates: list[Story],
+    threshold: float = STORY_JACCARD_THRESHOLD,
+    min_shared: int = STORY_MIN_SHARED_ENTITIES,
 ) -> Story | None:
-    """Pick the best-matching candidate story above `threshold`, else None."""
+    """Pick the best-matching candidate story above `threshold` with enough shared
+    entities, else None.
+
+    Both gates must hold: Jaccard similarity >= `threshold` AND at least
+    `min_shared` canonical entities in common. The second gate stops two articles
+    that share only one entity (which can still yield a high Jaccard on tiny sets)
+    from being merged into one story.
+    """
     best: Story | None = None
     best_score = 0.0
     for s in candidates:
-        sc = score_match(art_ids, set(s.entity_node_ids or []))
-        if sc > best_score:
+        s_ids = set(s.entity_node_ids or [])
+        sc = score_match(art_ids, s_ids)
+        shared = len(art_ids & s_ids)
+        if sc >= threshold and shared >= min_shared and sc > best_score:
             best, best_score = s, sc
-    if best is not None and best_score >= threshold:
-        return best
-    return None
+    return best
 
 
 def _recompute(session, story: Story) -> None:
