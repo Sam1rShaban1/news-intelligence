@@ -9,6 +9,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from config.settings import settings
+from src.collector.ssrf import is_safe_url
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,12 @@ def discover_articles(source: Any) -> list[dict[str, Any]]:
     Returns list of dicts with keys: url, title, published_date, author, summary.
     """
     entries: list[dict[str, Any]] = []
+
+    # SSRF guard: never fetch operator/user-supplied URLs that resolve to internal
+    # addresses. Seeded sources are public, so this only rejects misconfigured/bad ones.
+    if not is_safe_url(source.url) or (source.rss_url and not is_safe_url(source.rss_url)):
+        logger.warning("Refusing to fetch unsafe source URL for %s", source.name)
+        return []
 
     # 1. RSS feed
     if source.rss_url:

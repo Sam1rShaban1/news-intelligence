@@ -30,7 +30,7 @@ def run_fetch_cycle(config: WorkerConfig) -> int:
 
     with SessionLocal() as session:
         sources = session.execute(
-            select(Source).where(Source.enabled.is_(True))
+            select(Source).where(Source.enabled.is_(True), Source.deleted.is_(False))
         ).scalars().all()
         if not sources:
             return 0
