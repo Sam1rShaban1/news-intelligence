@@ -259,8 +259,8 @@ Views:
   inspector.
 - **Stories** — event clusters with their articles and dominant sentiment.
 
-The UI falls back to bundled mock data when the backend is unreachable, so it renders even
-before ingestion has produced anything.
+The UI shows an error state when the backend is unreachable, so it renders meaningfully
+only once ingestion has produced data.
 
 The app source lives in `ui/` (`Dockerfile`, `nginx.conf`, `vite.config.ts`, `src/`). It is
 built and run automatically by `docker compose up`.

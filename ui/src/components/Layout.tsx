@@ -73,7 +73,7 @@ export function Layout({ view, onNav, search, onSearch, online, children }: Layo
                 animation: online ? 'blink 1.4s step-end infinite' : 'none',
               }}
             />
-            {online ? 'LIVE' : 'MOCK DATA'}
+            {online ? 'LIVE' : 'OFFLINE'}
           </div>
         </div>
         {/* Nav tabs — desktop */}
