@@ -21,3 +21,22 @@ def test_english_default():
 
 def test_empty_defaults_english():
     assert detect_language("") == "en"
+
+
+def test_albanian_latin_without_e_trema():
+    # Albanian written without the ë diaeresis (common) — the old script heuristic
+    # defaulted this to English. langid recovers it.
+    text = (
+        "Kjo eshte nje lajm i ri nga qeveria qe tregon zhvillimet e fundit ne vend."
+    )
+    assert detect_language(text) == "sq"
+
+
+def test_turkish_latin_without_special_chars():
+    # Turkish without ğ/ş/ı/İ — with enough text langid resolves it (short samples
+    # collide with Indonesian/Malay). The old detector defaulted this to English.
+    text = (
+        "Türkiye Cumhuriyeti hazineden sorumlu bakanlarin katilimiyla ekonomik "
+        "reformlarin konusuldugu bir toplanti yapildi ve yeni kararlar alindi."
+    )
+    assert detect_language(text) == "tr"

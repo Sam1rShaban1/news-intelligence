@@ -23,6 +23,7 @@ dependencies = [
     "gliner2-onnx>=0.1",
     "onnxruntime>=1.18",
     "tokenizers>=0.19",
+    "langid>=1.1.6",
 ]
 
 [project.optional-dependencies]

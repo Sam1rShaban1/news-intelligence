@@ -30,6 +30,7 @@ RUN pip install --no-cache-dir . 2>/dev/null; \
     "gliner2-onnx>=0.1" \
     "onnxruntime>=1.18" \
     "tokenizers>=0.19" \
+    "langid>=1.1.6" \
     "pyyaml>=6.0" \
     "lxml"
 

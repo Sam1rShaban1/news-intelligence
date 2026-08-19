@@ -22,9 +22,19 @@ _RE_CYRILLIC = re.compile(r"[\u0400-\u04FF]")
 _RE_TURKISH = re.compile(r"[ğışĞIŞ]")
 _RE_ALBANIAN = re.compile(r"[ëË]")
 
+# Languages we actively support; anything else falls back to English.
+_SUPPORTED = {"mk", "sq", "tr", "en"}
+
 
 def detect_language(text: str | None) -> str:
-    """Detect language from character scripts: mk, tr, sq, en."""
+    """Detect language: mk, tr, sq, en.
+
+    High-precision script cues win first (Cyrillic -> Macedonian; Turkish/Albanian
+    diacritics -> tr/sq). For the remaining Latin-script text — including Albanian or
+    Turkish written without those diacritics, which the old script-only detector
+    mislabeled as English — a lightweight `langid` classifier resolves the language.
+    Unsupported classifier results fall back to English.
+    """
     if not text:
         return "en"
     if _RE_CYRILLIC.search(text):
@@ -33,7 +43,13 @@ def detect_language(text: str | None) -> str:
         return "tr"
     if _RE_ALBANIAN.search(text):
         return "sq"
-    return "en"
+    try:
+        from langid import classify
+
+        lang, _ = classify(text)
+    except Exception:  # langid unavailable — leave as English
+        return "en"
+    return lang if lang in _SUPPORTED else "en"
 
 
 def claim_articles(session, batch_size: int, zombie_timeout_minutes: int) -> list[Article]:
