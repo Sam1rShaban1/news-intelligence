@@ -12,6 +12,20 @@ async function get<T>(path: string, params?: Record<string, string | number | un
   return res.json()
 }
 
+async function mutate<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const res = await fetch(new URL(BASE + path, window.location.origin), {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const detail = typeof data === 'object' && data && 'detail' in data ? String(data.detail) : `HTTP ${res.status}`
+    throw new Error(detail)
+  }
+  return data as T
+}
+
 export const api = {
   overview: (opts?: { days?: number; interval?: string; language?: string }) =>
     get<any>('/analytics/overview', opts as any),
@@ -34,4 +48,14 @@ export const api = {
   story: (id: string) => get<any>(`/stories/${id}`),
   article: (id: string) => get<any>(`/articles/${id}`),
   health: () => get<any>('/health'),
+  sources: (opts?: { enabled?: boolean; include_deleted?: boolean }) =>
+    get<any>('/sources', opts as any),
+  createSource: (body: { name: string; url: string; rss_url?: string; enabled?: boolean }) =>
+    mutate<any>('/sources', 'POST', body),
+  updateSource: (id: string, body: Partial<{ name: string; url: string; rss_url?: string; enabled?: boolean }>) =>
+    mutate<any>(`/sources/${id}`, 'PATCH', body),
+  deleteSource: (id: string) =>
+    mutate<any>(`/sources/${id}`, 'DELETE'),
+  testSource: (id: string) =>
+    mutate<any>(`/sources/${id}/test`, 'POST'),
 }
