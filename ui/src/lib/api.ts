@@ -83,4 +83,33 @@ export const api = {
     mutate<any>('/search/semantic', 'POST', body),
   articlePdfUrl: (id: string) => `${BASE}/export/articles/${id}/pdf`,
   storyPdfUrl: (id: string) => `${BASE}/export/stories/${id}/pdf`,
+
+  // Watchlist
+  watchlist: () => get<any>('/watchlist'),
+  addWatchlist: (node_id: number, note?: string) =>
+    mutate<any>('/watchlist', 'POST', { node_id, note }),
+  removeWatchlist: (node_id: number) =>
+    mutate<any>(`/watchlist/${node_id}`, 'DELETE'),
+
+  // Entity dossier (replaces the removed /relationships endpoint)
+  entityDossier: (id: string) => get<any>(`/entities/nodes/${id}/dossier`),
+
+  // Story timeline
+  storyTimeline: (id: string) => get<any>(`/stories/${id}/timeline`),
+
+  // Tabular exports (CSV / JSON) — build a download URL with the same filters.
+  exportArticlesUrl: (opts?: Record<string, string | number | undefined>, format: 'csv' | 'json' = 'csv') => {
+    const u = new URL(`${BASE}/export/articles`, window.location.origin)
+    u.searchParams.set('format', format)
+    if (opts) for (const [k, v] of Object.entries(opts)) if (v !== undefined && v !== '') u.searchParams.set(k, String(v))
+    return u.toString()
+  },
+  exportSearchUrl: (opts?: Record<string, string | number | undefined>, format: 'csv' | 'json' = 'csv') => {
+    const u = new URL(`${BASE}/export/search`, window.location.origin)
+    u.searchParams.set('format', format)
+    if (opts) for (const [k, v] of Object.entries(opts)) if (v !== undefined && v !== '') u.searchParams.set(k, String(v))
+    return u.toString()
+  },
+  exportStoryUrl: (id: string, format: 'csv' | 'json' = 'csv') =>
+    `${BASE}/export/stories/${id}?format=${format}`,
 }
