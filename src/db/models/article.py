@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    ARRAY,
     CheckConstraint,
     DateTime,
     Float,
@@ -35,7 +36,9 @@ class Article(Base, TimestampMixin):
         Index("idx_articles_pubdate", "published_date"),
         Index("idx_articles_search", "search_vector", postgresql_using="gin"),
         CheckConstraint(
-            "status IN ('new','fetched','extracted','analyzed','sentiment_done','failed')"
+            "status IN ('new','fetched','extracting','extracted','analyzing',"
+            "'sentiment_done','ner_running','analyzed','failed','duplicate')",
+            name="ck_article_status",
         ),
     )
 
@@ -68,6 +71,13 @@ class Article(Base, TimestampMixin):
     retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Near-duplicate detection: when the same article body is ingested from a
+    # different source/URL, the later copy is marked `duplicate` and points here
+    # so analytics/stories are not double-counted.
+    duplicate_of_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("articles.id", ondelete="SET NULL"), nullable=True
+    )
+
     # Pipeline timestamps
     discovered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -88,6 +98,12 @@ class Article(Base, TimestampMixin):
     # Sentiment analysis
     sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     sentiment_label: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
+    # Semantic search embeddings (Phase 4; portable ARRAY(Float), no pgvector ext)
+    embedding: Mapped[list[float] | None] = mapped_column(ARRAY(Float), nullable=True)
+    embedded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Relationships
     source: Mapped["Source"] = relationship(back_populates="articles")

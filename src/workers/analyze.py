@@ -46,7 +46,8 @@ def run_analyze_cycle(config: WorkerConfig) -> int:
             if is_shutdown_requested():
                 break
 
-            # Mark as being processed
+            # Mark as being processed (distinct in-progress state).
+            article.status = "analyzing"
             article.started_at = datetime.now(timezone.utc)
             session.commit()
 
@@ -58,6 +59,7 @@ def run_analyze_cycle(config: WorkerConfig) -> int:
                 article.analyzed_at = datetime.now(timezone.utc)
                 article.error_message = None
                 article.started_at = None
+                article.retry_count = 0  # fresh budget for the NER stage
                 analyzed_count += 1
 
                 session.commit()

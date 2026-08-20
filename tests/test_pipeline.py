@@ -12,8 +12,18 @@ from src.db.models.article import Article
 from src.db.models.source import Source
 from src.db.session import SessionLocal
 
-# Statuses the pipeline actually assigns (mirrors workers + migration 003).
-PIPELINE_STATUSES = ["new", "fetched", "extracted", "analyzed", "sentiment_done", "failed"]
+# Statuses the pipeline actually assigns (mirrors workers + migration 010).
+PIPELINE_STATUSES = [
+    "new",
+    "fetched",
+    "extracting",
+    "extracted",
+    "analyzing",
+    "sentiment_done",
+    "ner_running",
+    "analyzed",
+    "failed",
+]
 
 
 def _make_source(db) -> int:
