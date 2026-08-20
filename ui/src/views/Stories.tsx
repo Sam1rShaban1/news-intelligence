@@ -7,6 +7,8 @@ const DAYS_OPTIONS = [3, 7, 14, 30]
 function StoryDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const [story, setStory] = useState<any>(null)
   const [error, setError] = useState(false)
+  const [timeline, setTimeline] = useState<any>(null)
+  const [timelineErr, setTimelineErr] = useState(false)
 
   useEffect(() => {
     setStory(null)
@@ -14,6 +16,14 @@ function StoryDetail({ id, onClose }: { id: string; onClose: () => void }) {
     api.story(id)
       .then(setStory)
       .catch(() => setError(true))
+  }, [id])
+
+  useEffect(() => {
+    setTimeline(null)
+    setTimelineErr(false)
+    api.storyTimeline(id)
+      .then(setTimeline)
+      .catch(() => setTimelineErr(true))
   }, [id])
 
   return (
@@ -48,6 +58,14 @@ function StoryDetail({ id, onClose }: { id: string; onClose: () => void }) {
                 style={{ fontSize: 9, padding: '3px 10px', border: '1px solid #0a0a0a', background: '#f5f5f0', letterSpacing: '0.1em', color: '#0a0a0a', textDecoration: 'none', cursor: 'pointer', fontWeight: 700 }}>
                 PDF
               </a>
+              <a href={api.exportStoryUrl(String(story.id), 'csv')} target="_blank" rel="noreferrer"
+                style={{ fontSize: 9, padding: '3px 10px', border: '1px solid #0a0a0a', background: '#f5f5f0', letterSpacing: '0.1em', color: '#0a0a0a', textDecoration: 'none', cursor: 'pointer', fontWeight: 700 }}>
+                CSV
+              </a>
+              <a href={api.exportStoryUrl(String(story.id), 'json')} target="_blank" rel="noreferrer"
+                style={{ fontSize: 9, padding: '3px 10px', border: '1px solid #0a0a0a', background: '#f5f5f0', letterSpacing: '0.1em', color: '#0a0a0a', textDecoration: 'none', cursor: 'pointer', fontWeight: 700 }}>
+                JSON
+              </a>
               <button onClick={onClose} style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
             </div>
             <div>
@@ -64,6 +82,42 @@ function StoryDetail({ id, onClose }: { id: string; onClose: () => void }) {
                   </div>
                 </div>
               ))}
+            </div>
+            <div style={{ borderTop: '2px solid #0a0a0a', marginTop: 14, padding: '16px 20px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', marginBottom: 10 }}>TIMELINE</div>
+              {timelineErr ? <EmptyState msg="COULD NOT LOAD TIMELINE" /> : !timeline ? <LoadingDots /> : (
+                <>
+                  {timeline.timeline?.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90, marginBottom: 12 }}>
+                      {timeline.timeline.map((t: any) => {
+                        const max = Math.max(1, ...timeline.timeline.map((x: any) => x.count))
+                        const h = Math.round((t.count / max) * 80)
+                        const neg = t.neg > t.pos
+                        return (
+                          <div key={t.date} title={`${t.date}: ${t.count} articles`}
+                            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 3 }}>
+                            <span style={{ fontSize: 8, fontVariantNumeric: 'tabular-nums' }}>{t.count}</span>
+                            <div style={{ width: '100%', height: h, background: neg ? '#555550' : '#0a0a0a' }} />
+                            <span style={{ fontSize: 7, color: '#555550', transform: 'rotate(-45deg)', whiteSpace: 'nowrap' }}>{t.date?.slice(5)}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {timeline.articles?.length > 0 && (
+                    <div>
+                      {timeline.articles.map((a: any, i: number) => (
+                        <div key={a.id} style={{ padding: '8px 0', borderBottom: i < timeline.articles.length - 1 ? '1px solid #d4d4cc' : 'none', display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontSize: 8, color: '#555550', width: 64, flexShrink: 0 }}>{a.published_date?.slice(0, 10) ?? a.discovered_at?.slice(0, 10)}</span>
+                          <a href={a.url} target="_blank" rel="noreferrer" style={{ flex: 1, fontSize: 11, fontWeight: 600, color: '#0a0a0a', textDecoration: 'none' }}>{a.title}</a>
+                          {a.sentiment_label && <SentimentChip label={a.sentiment_label} />}
+                          {a.language && <LangBadge lang={a.language} />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </>
         )}
