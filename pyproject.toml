@@ -14,19 +14,32 @@ dependencies = [
     "httpx>=0.27",
     "feedparser>=6.0",
     "newspaper4k[lxml]>=0.9",
-    "apscheduler>=3.10",
+    "apscheduler==3.10.4",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "pydantic-settings>=2.0",
     "vaderSentiment>=3.3",
-    "pgvector>=0.3",
-    "gliner2-onnx>=0.1",
-    "onnxruntime>=1.18",
-    "tokenizers>=0.19",
     "langid>=1.1.6",
+    "beautifulsoup4>=4.12",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
+# Heavy ML deps — NOT required to run the core pipeline on a Raspberry Pi.
+# Install via `pip install ".[ner]"` (or the `vps` Docker target).
+ner = [
+    "gliner2-onnx>=0.1",
+    "onnxruntime>=1.18",
+    "tokenizers>=0.19",
+]
+# Vector embeddings (Phase 4, optional). Requires a pgvector-enabled Postgres.
+embeddings = [
+    "pgvector>=0.3",
+]
+# Server-side PDF export of articles / stories (Phase 4, optional, vps only).
+pdf = [
+    "reportlab>=4.0",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.5",

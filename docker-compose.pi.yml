@@ -1,6 +1,20 @@
+# Raspberry Pi deployment (4B / 8GB, no GPU).
+#
+# Builds the lightweight `pi` Docker target: the heavy ONNX / pgvector stack is
+# NOT installed, and NER + embeddings are disabled via the FEATURE_* flags. The
+# pipeline still runs fetch -> extract -> sentiment (VADER + mk/sq/tr lexicon),
+# de-duplication, merge, and the full web UI + API.
+#
+#   docker compose -f docker-compose.pi.yml build --target pi
+#   docker compose -f docker-compose.pi.yml up -d
+#
+# Use the default `docker-compose.yml` (target `vps`) on a VPS for full features
+# (multilingual GLiNER2 NER, baked sentiment transformer, vector embeddings).
+
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    # Plain Postgres on the Pi (pgvector image has no arm64 build; embeddings are off).
+    image: postgres:16
     environment:
       POSTGRES_USER: news
       POSTGRES_PASSWORD: news
@@ -19,7 +33,7 @@ services:
 
   worker:
     build:
-      target: vps
+      target: pi
     command: ["-m", "src.workers"]
     depends_on:
       postgres:
@@ -30,7 +44,10 @@ services:
         condition: service_completed_successfully
     environment:
       NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
-      NEWS_SENTIMENT_MODEL: transformer
+      # Lightweight sentiment only (VADER + mk/sq/tr lexicon).
+      NEWS_SENTIMENT_MODEL: auto
+      NEWS_FEATURE_NER: "false"
+      NEWS_FEATURE_EMBEDDINGS: "false"
       NEWS_LOG_LEVEL: INFO
     volumes:
       - ./config:/app/config:ro
@@ -42,34 +59,9 @@ services:
       timeout: 10s
       retries: 3
 
-  ner:
-    build:
-      target: vps
-    command: ["-m", "src.workers.ner_service"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-      seed:
-        condition: service_completed_successfully
-    environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
-      NEWS_LOG_LEVEL: INFO
-    volumes:
-      - ./config:/app/config:ro
-      - hf_cache:/root/.cache/huggingface
-    mem_limit: 2g
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:news@postgres:5432/news_intelligence')\""]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   migrate:
     build:
-      target: vps
+      target: pi
     command: ["-m", "alembic", "upgrade", "head"]
     depends_on:
       postgres:
@@ -80,7 +72,7 @@ services:
 
   seed:
     build:
-      target: vps
+      target: pi
     command: ["scripts/seed_sources.py"]
     depends_on:
       migrate:
@@ -92,63 +84,17 @@ services:
       - ./config:/app/config:ro
     restart: "no"
 
-  alerts:
-    build:
-      target: vps
-    command: ["-m", "src.workers.alerts_service"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-      seed:
-        condition: service_completed_successfully
-    environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
-      NEWS_LOG_LEVEL: INFO
-    volumes:
-      - ./config:/app/config:ro
-    mem_limit: 512m
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:news@postgres:5432/news_intelligence')\""]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  embeddings:
-    build:
-      target: vps
-    command: ["-m", "src.workers.embeddings_service"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-      seed:
-        condition: service_completed_successfully
-    environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
-      NEWS_LOG_LEVEL: INFO
-    volumes:
-      - ./config:/app/config:ro
-    mem_limit: 2g
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:news@postgres:5432/news_intelligence')\""]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   web:
     build:
-      target: vps
+      target: pi
     command: ["-m", "src.api.main"]
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_FEATURE_NER: "false"
+      NEWS_FEATURE_EMBEDDINGS: "false"
       NEWS_LOG_LEVEL: INFO
     ports:
       - "8000:8000"
@@ -178,4 +124,3 @@ services:
 
 volumes:
   pgdata:
-  hf_cache:

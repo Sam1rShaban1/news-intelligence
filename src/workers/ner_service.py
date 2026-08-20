@@ -16,6 +16,7 @@ from src.nlp.graph import build_article_graph
 from src.nlp.ner import extract_entities
 from src.nlp.relations import build_relationships
 from src.nlp.stories import assign_story
+from config.settings import settings
 from src.workers.lifecycle import WorkerConfig, install_signal_handlers, is_shutdown_requested
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,11 @@ def run_ner_cycle(config: WorkerConfig) -> int:
                 break
 
             try:
+                # Mark as being processed (distinct in-progress state).
+                article.status = "ner_running"
+                article.started_at = datetime.now(timezone.utc)
+                session.commit()
+
                 text = article.content or article.summary or article.title or ""
                 raw_entities = extract_entities(text)
                 build_article_graph(session, article.id, raw_entities)
@@ -67,6 +73,7 @@ def run_ner_cycle(config: WorkerConfig) -> int:
                 article.analyzed_at = datetime.now(timezone.utc)
                 article.error_message = None
                 article.started_at = None
+                article.retry_count = 0
                 processed += 1
 
                 session.commit()
@@ -99,6 +106,9 @@ def run_ner_cycle(config: WorkerConfig) -> int:
 
 def run_ner_worker_loop(config: WorkerConfig | None = None) -> None:
     """Main NER worker loop — runs until shutdown signal."""
+    if not settings.feature_ner:
+        logger.warning("FEATURE_NER is disabled — NER service will not run. Exiting.")
+        return
     config = config or WorkerConfig()
     logger.info("NER service started, polling every %ds", config.poll_interval)
 

@@ -32,8 +32,12 @@ containerised with Docker Compose.
 
 ## Architecture
 
-All services are defined in `docker-compose.yml` and built from the single `Dockerfile`
-(`build: .`). They share one Postgres database and talk over the compose network.
+All services are defined in `docker-compose.yml` and built from the multi-stage
+`Dockerfile`. The default `vps` target installs the full stack (multilingual GLiNER2
+NER + baked ONNX sentiment + `pgvector`); `docker compose build --target pi` (or
+`docker-compose.pi.yml`) builds a lightweight image for a Raspberry Pi that omits the
+heavy ML stack and disables NER/embeddings via the `FEATURE_*` flags. They share one
+Postgres database and talk over the compose network.
 
 | Service     | Image (built from `.`)          | RAM     | Role |
 |-------------|--------------------------------|---------|------|
@@ -368,23 +372,34 @@ docker compose up -d
 
 ### Deploying to a Raspberry Pi 4B (8 GB)
 
+Use the lightweight `pi` build target — `docker-compose.pi.yml` builds the `pi`
+Docker target (no ONNX / pgvector), disables NER + embeddings via the `FEATURE_*`
+flags, and uses plain `postgres:16`. Fetch/extract/sentiment (VADER + mk/sq/tr
+lexicon) still run, along with de-duplication, merge, and the full web UI + API.
+
 1. Build on the laptop, then transfer images (no registry needed):
 
    ```bash
-   docker compose build
-    docker save news-intelligence-worker news-intelligence-web \
-      news-intelligence-frontend pgvector/pgvector:pg16 | gzip > ni_images.tar.gz
-   scp ni_images.tar.gz pi@<PI_IP>:/tmp/
-   ssh pi@<PI_IP> 'docker load < /tmp/ni_images.tar.gz'
+   docker compose -f docker-compose.pi.yml build --target pi
+   docker save news-intelligence-worker news-intelligence-web \
+     news-intelligence-frontend postgres:16 | gzip > ni_pi_images.tar.gz
+   scp ni_pi_images.tar.gz pi@<PI_IP>:/tmp/
+   ssh pi@<PI_IP> 'docker load < /tmp/ni_pi_images.tar.gz'
    ```
 
 2. On the Pi:
 
    ```bash
-   docker compose up -d postgres
-   docker compose ps            # wait until postgres is "healthy"
-   docker compose up -d        # migrate + seed run automatically, then all services start
+   docker compose -f docker-compose.pi.yml up -d postgres
+   docker compose -f docker-compose.pi.yml ps   # wait until postgres is "healthy"
+   docker compose -f docker-compose.pi.yml up -d # migrate + seed run automatically, then services start
    ```
+
+> On the Pi there is **no `ner` service** (entity extraction / knowledge-graph
+> building are disabled) and sentiment uses VADER + the mk/sq/tr lexicon (no
+> transformer model). On a VPS, use the default `docker-compose.yml`
+> (`build --target vps`) for full multilingual GLiNER2 NER + baked sentiment
+> transformer + vector embeddings.
 
 ### First-run notes
 
