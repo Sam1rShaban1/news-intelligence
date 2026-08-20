@@ -1,10 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { api } from '../lib/api'
-import {
-  AreaChart, Area, XAxis, YAxis, Legend, Tooltip,
-  BarChart, Bar,
-  type ChartConfig,
-} from '../components/dither-kit'
+import { MiniStackedBars } from '../components/charts'
 import {
   Section, Card, KpiTile, SentimentChip, LangBadge,
   SkelKpiRow, SkelChartArea, SkelArticleRows, EmptyState,
@@ -47,18 +43,18 @@ export function Overview({ search: _search, onNav }: { search: string; onNav?: (
     return () => ac.abort()
   }, [])
 
-  const sentConfig: ChartConfig = useMemo(() => ({
-    positive: { label: 'Positive', color: 'green' },
-    neutral:  { label: 'Neutral',  color: 'blue' },
-    negative: { label: 'Negative', color: 'red' },
-  }), [])
+  const sentConfig = useMemo<{ key: string; color: string; label: string }[]>(() => ([
+    { key: 'positive', color: '#0a0a0a', label: 'Positive' },
+    { key: 'neutral', color: '#888880', label: 'Neutral' },
+    { key: 'negative', color: '#555550', label: 'Negative' },
+  ]), [])
 
-  const langConfig: ChartConfig = useMemo(() => ({
-    mk: { label: 'MK', color: 'blue' },
-    sq: { label: 'SQ', color: 'orange' },
-    en: { label: 'EN', color: 'purple' },
-    tr: { label: 'TR', color: 'pink' },
-  }), [])
+  const langConfig = useMemo<{ key: string; color: string; label: string }[]>(() => ([
+    { key: 'mk', color: '#0a0a0a', label: 'MK' },
+    { key: 'sq', color: '#555550', label: 'SQ' },
+    { key: 'en', color: '#888880', label: 'EN' },
+    { key: 'tr', color: '#cfcfc6', label: 'TR' },
+  ]), [])
 
   const sentData = useMemo(() =>
     (data?.sentiment_over_time ?? []).map((r: any) => ({
@@ -113,15 +109,7 @@ export function Overview({ search: _search, onNav }: { search: string; onNav?: (
         <Section title="SENTIMENT OVER TIME" sub="7D WINDOW">
           <Card>
             {!data && !dataError ? <SkelChartArea height={176} /> : sentData.length === 0 ? <EmptyState msg="NO DATA" /> : (
-              <AreaChart data={sentData} config={sentConfig} bloom="off" className="h-44">
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip labelKey="date" />
-                <Legend />
-                <Area dataKey="negative" variant="solid" />
-                <Area dataKey="positive" variant="hatched" />
-                <Area dataKey="neutral" variant="dotted" />
-              </AreaChart>
+              <MiniStackedBars data={sentData} series={sentConfig} xKey="date" height={150} />
             )}
           </Card>
         </Section>
@@ -129,16 +117,7 @@ export function Overview({ search: _search, onNav }: { search: string; onNav?: (
         <Section title="LANGUAGE MIX" sub="DAILY DISTRIBUTION">
           <Card>
             {!data && !dataError ? <SkelChartArea height={176} /> : langData.length === 0 ? <EmptyState msg="NO DATA" /> : (
-              <BarChart data={langData} config={langConfig} bloom="off" className="h-44">
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip labelKey="date" />
-                <Legend />
-                <Bar dataKey="mk" variant="solid" />
-                <Bar dataKey="sq" variant="hatched" />
-                <Bar dataKey="en" variant="dotted" />
-                <Bar dataKey="tr" variant="gradient" />
-              </BarChart>
+              <MiniStackedBars data={langData} series={langConfig} xKey="date" height={150} />
             )}
           </Card>
         </Section>

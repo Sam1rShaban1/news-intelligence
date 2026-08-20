@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
-import {
-  PieChart, Pie, Legend, Tooltip,
-  BarChart, Bar, XAxis, YAxis,
-  type ChartConfig,
-} from '../components/dither-kit'
+import { MiniDonut, MiniStackedBars } from '../components/charts'
 import { Section, Card, SentimentChip, LangBadge, SkelChartArea, SkelArticleRows, EmptyState } from '../components/Layout'
 
 const LANGS = ['mk', 'sq', 'en', 'tr']
 const LABEL_MAP: Record<string, string> = { pos: 'positive', neg: 'negative', neutral: 'neutral' }
 const normLabel = (l: string) => LABEL_MAP[l] ?? l
+
+const PIE_COLORS: Record<string, string> = { positive: '#28d26e', negative: '#f04646', neutral: '#358ff3' }
 
 export function Sentiment() {
   const [dist, setDist] = useState<any>(null)
@@ -25,19 +23,16 @@ export function Sentiment() {
       .catch(() => setRecent([]))
   }, [])
 
-  const pieConfig: ChartConfig = {
-    positive: { label: 'Positive', color: 'green' },
-    neutral:  { label: 'Neutral',  color: 'blue' },
-    negative: { label: 'Negative', color: 'red' },
-  }
-  const byLangConfig: ChartConfig = {
-    positive: { label: 'Positive', color: 'green' },
-    neutral:  { label: 'Neutral',  color: 'blue' },
-    negative: { label: 'Negative', color: 'red' },
-  }
-
   const total = dist?.total_analyzed ?? 0
-  const pieData = (dist?.distribution ?? []).map((item: any) => ({ name: normLabel(item.label), value: item.count }))
+  const pieData = (dist?.distribution ?? []).map((item: any) => {
+    const name = normLabel(item.label)
+    return { name, value: item.count, color: PIE_COLORS[name] ?? '#888880' }
+  })
+  const byLangSeries = [
+    { key: 'positive', color: '#28d26e', label: 'Positive' },
+    { key: 'neutral', color: '#358ff3', label: 'Neutral' },
+    { key: 'negative', color: '#f04646', label: 'Negative' },
+  ]
   const byLangData = LANGS.map(l => {
     const d = dist?.by_language?.[l] ?? {}
     return { lang: l.toUpperCase(), positive: d.positive ?? d.pos ?? 0, neutral: d.neutral ?? 0, negative: d.negative ?? d.neg ?? 0 }
@@ -71,11 +66,7 @@ export function Sentiment() {
                     <span>TOTAL</span><span>{total.toLocaleString()}</span>
                   </div>
                 </div>
-                <PieChart data={pieData} config={pieConfig} dataKey="value" nameKey="name" innerRadius={0.4} bloom="off" className="h-52">
-                  <Pie variant="hatched" />
-                  <Legend />
-                  <Tooltip labelKey="name" />
-                </PieChart>
+                <MiniDonut data={pieData} size={170} stroke={24} />
               </div>
             )}
           </Card>
@@ -84,15 +75,7 @@ export function Sentiment() {
         <Section title="BY LANGUAGE" sub="STACKED COUNTS">
           <Card>
             {!dist && !distError ? <SkelChartArea height={208} /> : distError ? <EmptyState msg="COULD NOT REACH API" /> : (
-              <BarChart data={byLangData} config={byLangConfig} bloom="off" className="h-52">
-                <XAxis dataKey="lang" />
-                <YAxis />
-                <Tooltip labelKey="lang" />
-                <Legend />
-                <Bar dataKey="positive" variant="dotted" />
-                <Bar dataKey="neutral" variant="hatched" />
-                <Bar dataKey="negative" variant="solid" />
-              </BarChart>
+              <MiniStackedBars data={byLangData} series={byLangSeries} xKey="lang" height={180} />
             )}
           </Card>
         </Section>
