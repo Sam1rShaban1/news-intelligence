@@ -147,11 +147,14 @@ def safe_fetch(
         try:
             if parsed.scheme == "https":
                 ctx = ssl.create_default_context()
-                conn = http.client.HTTPSConnection(
-                    ip, port, timeout=timeout, context=ctx, server_hostname=parsed.hostname
-                )
+                raw = socket.create_connection((ip, port), timeout=timeout)
+                ssock = ctx.wrap_socket(raw, server_hostname=parsed.hostname)
+                conn = http.client.HTTPSConnection(parsed.hostname, port, timeout=timeout)
+                conn.sock = ssock
             else:
-                conn = http.client.HTTPConnection(ip, port, timeout=timeout)
+                raw = socket.create_connection((ip, port), timeout=timeout)
+                conn = http.client.HTTPConnection(parsed.hostname, port, timeout=timeout)
+                conn.sock = raw
             conn.request(
                 "GET",
                 path,
