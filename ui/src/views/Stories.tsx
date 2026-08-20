@@ -44,6 +44,10 @@ function StoryDetail({ id, onClose }: { id: string; onClose: () => void }) {
                   {story.first_seen && <span style={{ fontSize: 9, color: '#555550' }}>{story.first_seen.slice(0, 10)} → {story.last_seen?.slice(0, 10)}</span>}
                 </div>
               </div>
+              <a href={api.storyPdfUrl(String(story.id))} target="_blank" rel="noreferrer"
+                style={{ fontSize: 9, padding: '3px 10px', border: '1px solid #0a0a0a', background: '#f5f5f0', letterSpacing: '0.1em', color: '#0a0a0a', textDecoration: 'none', cursor: 'pointer', fontWeight: 700 }}>
+                PDF
+              </a>
               <button onClick={onClose} style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
             </div>
             <div>
