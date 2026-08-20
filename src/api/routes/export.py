@@ -52,7 +52,7 @@ def export_articles(
     offset: int = Query(default=0, ge=0),
     source_id: Optional[int] = Query(default=None),
     status: Optional[str] = Query(default=None),
-    since: Optional[str] = Query(default=None, description="ISO date (discovered_at >=)"),
+    since: Optional[date] = Query(default=None, description="ISO date (discovered_at >=)"),
     db: Session = Depends(get_db),
 ) -> Response | dict:
     """Export the article list in CSV or JSON (same filters as GET /articles)."""

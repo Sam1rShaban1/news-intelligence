@@ -42,10 +42,15 @@ def create_app() -> FastAPI:
         description="Self-hosted news analysis platform",
     )
 
+    origins = _parse_origins(settings.cors_origins)
+    # A wildcard origin must not be combined with credentials (browsers reject it
+    # and Starlette would otherwise reflect arbitrary origins).
+    allow_credentials = origins != ["*"]
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=_parse_origins(settings.cors_origins),
-        allow_credentials=True,
+        allow_origins=origins,
+        allow_credentials=allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )

@@ -167,19 +167,19 @@ def semantic_search(body: SemanticQuery, db: Session = Depends(get_db)) -> dict:
     qvec = embedder.embed([q])[0]
 
     rows = db.execute(
-        select(Article).where(
-            Article.status == "analyzed", Article.embedding.isnot(None)
-        )
-    ).scalars().all()
+        select(Article, Source.name.label("source_name"))
+        .join(Source, Source.id == Article.source_id)
+        .where(Article.status == "analyzed", Article.embedding.isnot(None))
+    ).all()
 
     scored = []
-    for a in rows:
+    for a, source_name in rows:
         if body.language and a.language != body.language:
             continue
         sim = cosine(qvec, a.embedding)
         if sim <= 0:
             continue
-        scored.append((sim, a))
+        scored.append((sim, a, source_name))
     scored.sort(key=lambda x: -x[0])
     top = scored[: body.limit]
 
@@ -192,13 +192,13 @@ def semantic_search(body: SemanticQuery, db: Session = Depends(get_db)) -> dict:
                 "title": a.title,
                 "url": a.url,
                 "source_id": a.source_id,
-                "source_name": a.source_name if hasattr(a, "source_name") else None,
+                "source_name": source_name,
                 "language": a.language,
                 "sentiment_label": a.sentiment_label,
                 "published_date": a.published_date.isoformat() if a.published_date else None,
                 "summary": a.summary,
                 "score": round(sim, 4),
             }
-            for sim, a in top
+            for sim, a, source_name in top
         ],
     }
