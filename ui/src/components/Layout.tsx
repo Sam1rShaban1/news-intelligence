@@ -1,6 +1,6 @@
 import { type ReactNode, type CSSProperties } from 'react'
 
-export type View = 'overview' | 'explore' | 'sentiment' | 'entities' | 'graph' | 'stories' | 'sources' | 'alerts'
+export type View = 'overview' | 'explore' | 'sentiment' | 'entities' | 'graph' | 'stories' | 'watchlist' | 'alerts' | 'sources'
 
 const NAV = [
   { id: 'overview' as View, label: 'OVERVIEW', glyph: '◉' },
@@ -9,6 +9,7 @@ const NAV = [
   { id: 'entities' as View, label: 'ENTITIES', glyph: '◈' },
   { id: 'graph' as View, label: 'GRAPH', glyph: '⬡' },
   { id: 'stories' as View, label: 'STORIES', glyph: '▤' },
+  { id: 'watchlist' as View, label: 'WATCHLIST', glyph: '☰' },
   { id: 'alerts' as View, label: 'ALERTS', glyph: '◬' },
   { id: 'sources' as View, label: 'SOURCES', glyph: '⌁' },
 ]
@@ -163,12 +164,20 @@ export function Layout({ view, onNav, search, onSearch, online, children }: Layo
   )
 }
 
-export function Section({ title, sub, children, fill }: { title: string; sub?: string; children: ReactNode; fill?: boolean }) {
+export function Section({ title, sub, children, fill, onAction }: { title: string; sub?: string; children: ReactNode; fill?: boolean; onAction?: { label: string; onClick: () => void } }) {
   return (
     <div style={{ marginBottom: fill ? 0 : 28, display: 'flex', flexDirection: 'column', flex: fill ? 1 : undefined, minHeight: fill ? 0 : undefined }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10, borderBottom: '2px solid #0a0a0a', paddingBottom: 6 }}>
         <h2 style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', margin: 0 }}>{title}</h2>
         {sub && <span style={{ fontSize: 9, color: '#555550', letterSpacing: '0.1em' }}>{sub}</span>}
+        {onAction && (
+          <button
+            onClick={onAction.onClick}
+            style={{ marginLeft: 'auto', fontSize: 8, letterSpacing: '0.14em', padding: '3px 10px', border: '1px solid #0a0a0a', background: '#0a0a0a', color: '#f5f5f0', cursor: 'pointer', fontWeight: 700 }}
+          >
+            {onAction.label}
+          </button>
+        )}
       </div>
       <div style={{ flex: fill ? 1 : undefined, minHeight: fill ? 0 : undefined, display: 'flex', flexDirection: 'column' }}>
         {children}
@@ -177,9 +186,10 @@ export function Section({ title, sub, children, fill }: { title: string; sub?: s
   )
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
+export function Card({ children, style, onClick }: { children: ReactNode; style?: React.CSSProperties; onClick?: () => void }) {
   return (
     <div
+      onClick={onClick}
       style={{
         border: '1px solid #0a0a0a',
         background: '#efefea',
