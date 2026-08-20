@@ -12,6 +12,7 @@ interface SourceRow {
   error_count: number
   last_error: string | null
   last_scanned_at: string | null
+  credibility?: { score: number; grade: string } | null
 }
 
 const mono: React.CSSProperties = { fontFamily: 'Space Mono, monospace' }
@@ -179,6 +180,7 @@ export function Sources() {
               <th style={th}>SITE</th>
               <th style={th}>RSS</th>
               <th style={th}>ARTICLES</th>
+              <th style={th}>CREDIBILITY</th>
               <th style={th}>STATUS</th>
               <th style={th}>LAST ERROR</th>
               <th style={th}></th>
@@ -195,6 +197,21 @@ export function Sources() {
                   {s.rss_url ?? '—'}
                 </td>
                 <td style={td}>{s.article_count}</td>
+                <td style={td}>
+                  {s.credibility ? (
+                    <span
+                      style={{
+                        border: '1px solid #0a0a0a',
+                        padding: '1px 6px',
+                        fontSize: 9,
+                        fontWeight: 700,
+                        background: credBg(s.credibility.grade),
+                      }}
+                    >
+                      {s.credibility.grade} · {s.credibility.score}
+                    </span>
+                  ) : '—'}
+                </td>
                 <td style={td}>
                   <span
                     style={{
@@ -228,7 +245,7 @@ export function Sources() {
             ))}
             {sources.length === 0 && (
               <tr>
-                <td style={td} colSpan={7}>No sources yet — add one above.</td>
+                <td style={td} colSpan={8}>No sources yet — add one above.</td>
               </tr>
             )}
           </tbody>
@@ -271,3 +288,13 @@ const mini: React.CSSProperties = {
 
 const th: React.CSSProperties = { padding: '5px 6px', fontSize: 9, letterSpacing: '0.06em', opacity: 0.7 }
 const td: React.CSSProperties = { padding: '6px', verticalAlign: 'top' }
+
+function credBg(grade: string): string {
+  switch (grade) {
+    case 'A': return '#0a0a0a'
+    case 'B': return '#555550'
+    case 'C': return '#888880'
+    case 'D': return '#a0a090'
+    default: return '#cfcfc6'
+  }
+}
