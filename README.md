@@ -51,7 +51,10 @@ Postgres database and talk over the compose network.
 
 > The `worker` and `ner` services use the **same image** but different commands
 > (`src.workers` vs `src.workers.ner_service`) so the heavy NER model never blocks
-> fetch/extract/sentiment.
+> fetch/extract/sentiment. The `ner` service is also **horizontally scalable** — run
+> several replicas with `docker compose up --scale ner=N` (see
+> *Operations → Scaling NER horizontally*); it claims work with a Postgres row lock so
+> replicas never double-process the same article.
 
 ### Data-flow / status state machine
 
@@ -103,7 +106,8 @@ new → fetched → extracted → sentiment_done → analyzed
 > **GLiNER2 constraint:** its `extract_entities(text, labels, threshold)` accepts a
 > *single* string (no native batching). NER throughput therefore comes from bulk DB
 > writes, a larger `batch_size`, ONNX thread tuning, and incremental story assignment
-> — not from model-level batching.
+> — and, most effectively, by running multiple `ner` replicas (see
+> *Operations → Scaling NER horizontally*).
 
 ---
 
@@ -299,7 +303,7 @@ template is provided in [`.env.example`](.env.example).
 |----------|---------|---------|
 | `NEWS_DATABASE_URL` | `postgresql://news:news@localhost:5432/news_intelligence` | DB connection (compose uses the `postgres` service host). |
 | `NEWS_POLL_INTERVAL_SECONDS` | `60` | Worker poll interval. |
-| `NEWS_BATCH_SIZE` | `10` | Articles claimed per cycle (NER uses `30`). |
+| `NEWS_BATCH_SIZE` | `10` | Articles claimed per cycle by the `worker` (sentiment stage). The `ner` service uses its own `NEWS_NER_BATCH_SIZE` (below). |
 | `NEWS_ZOMBIE_TIMEOUT_MINUTES` | `5` | Reclaim stuck articles after this. |
 | `NEWS_MAX_RETRIES` | `3` | Retries before marking `failed`. |
 | `NEWS_HTTP_TIMEOUT` | `15` | HTTP timeout for fetches. |
@@ -310,6 +314,10 @@ template is provided in [`.env.example`](.env.example).
 | `NEWS_GLINER_MODEL` | `lmo3/gliner2-multi-v1-onnx` | GLiNER2 ONNX model repo. |
 | `NEWS_SENTIMENT_MODEL` | `auto` | `auto` \| `transformer` \| `lexicon`. |
 | `NEWS_SENTIMENT_MODEL_PATH` | `/app/models/sentiment.onnx` | Transformer ONNX path. |
+| `NEWS_NER_BATCH_SIZE` | `30` | Articles claimed per NER cycle (set to `50` on the `ner` service in `docker-compose.yml`). |
+| `NEWS_NER_POLL_INTERVAL` | `5` | Seconds the NER loop sleeps between cycles (set to `2` in compose). |
+| `NEWS_NER_ZOMBIE_MIN` | `5` | Reclaim `ner_running` articles stuck longer than this. |
+| `NEWS_NER_MAX_RETRIES` | `3` | NER retries before marking an article `failed`. |
 
 > The Docker image **bakes** the sentiment ONNX + tokenizer into `/app/models` at build
 > time (see `Dockerfile`), so `NEWS_SENTIMENT_MODEL=transformer` works out of the box.
@@ -447,6 +455,56 @@ NEWS_SMOKE_NER=1 docker compose run --rm ner -m src.workers.smoke
 
 Both print a `=== SMOKE TEST SUMMARY ===` with article / entity / graph counts.
 Optional env: `NEWS_SMOKE_SOURCES=<n>`, `NEWS_SMOKE_ITERS=<n>`.
+
+### Scaling NER horizontally
+
+The `ner` service is designed to scale out. It claims work with a Postgres row lock
+(`SELECT … FOR UPDATE SKIP LOCKED`) on `sentiment_done` / `ner_running` articles, so
+any number of replicas are mutually safe — no shared queue, no coordination, and no
+double-processing. Each replica loads its own GLiNER2 ONNX model (~1.5–2 GB RAM).
+
+Run N replicas with Compose's scale flag (the `ner` service has no published ports and
+no fixed container name, so this works out of the box):
+
+```bash
+docker compose up -d --scale ner=4
+```
+
+Scale up/down later the same way (`--scale ner=<N>`). A fuller guide, including thread
+tuning and sizing math, is in [`docs/SCALING.md`](docs/SCALING.md).
+
+**Tuning (set on the `ner` service in `docker-compose.yml`):**
+
+| Setting | Why |
+|---------|-----|
+| `OMP_NUM_THREADS` / `ORT_NUM_THREADS` | Cap ONNX/OpenMP threads **per replica** so N replicas don't oversubscribe the CPU. Keep `N × threads ≲ cores` (default `2`). |
+| `NEWS_NER_BATCH_SIZE` | Articles claimed per cycle — raise to keep replicas busy (default `30`; compose sets `50`). |
+| `NEWS_NER_POLL_INTERVAL` | Seconds between cycles — lower to reduce idle gap (default `5`; compose sets `2`). |
+
+**Sizing:** total NER RAM ≈ `N × 2 GB`. On a 16 GB laptop, `N=4` (~8 GB) leaves
+headroom for the other services; push to `N=5–6` only if you see free RAM. **Do not
+scale the `worker` service** — it runs the scheduler, so multiple instances would
+duplicate feed fetches. `ner` is the only safe `--scale` target.
+
+> **Docker Desktop (macOS):** the default Docker VM is ~2 GB RAM / few cores. Raise
+> **Settings → Resources → Memory to ~12–14 GB** (and CPU to ~8) or every replica gets
+> OOM-killed. Native Linux Docker is fine as-is.
+
+**Verify it's working:**
+
+```bash
+docker compose logs --tail=20 ner   # expect "NER cycle: N articles analyzed" across -ner-1 … -ner-4
+docker compose exec postgres psql -U news -d news_intelligence \
+  -c "SELECT status, count(*) FROM articles GROUP BY status ORDER BY 2 DESC;"
+```
+
+`sentiment_done` should drain; throughput ≈ `N ×` the single-replica rate.
+
+**Caveats:**
+- *Story assignment is eventual-consistency* (`assign_story`): concurrent replicas may
+  rarely spawn a duplicate story cluster. Soft issue, not a crash; reconcilable later.
+- *Cold-start burst:* all replicas load the ONNX model at boot (CPU/IO spike), but the
+  shared `hf_cache` volume avoids re-downloading the weights.
 
 ---
 
