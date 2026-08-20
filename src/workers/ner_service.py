@@ -6,6 +6,7 @@ extracts entities, builds the knowledge graph, and marks them `analyzed`.
 """
 
 import logging
+import os
 from datetime import datetime, timezone
 
 from sqlalchemy import select, text
@@ -130,7 +131,12 @@ def run_ner_worker_loop(config: WorkerConfig | None = None) -> None:
 def main() -> None:
     install_signal_handlers()
     logger.info("NER service starting...")
-    config = WorkerConfig()
+    config = WorkerConfig(
+        poll_interval=int(os.getenv("NEWS_NER_POLL_INTERVAL", "5")),
+        batch_size=int(os.getenv("NEWS_NER_BATCH_SIZE", "30")),
+        zombie_timeout_minutes=int(os.getenv("NEWS_NER_ZOMBIE_MIN", "5")),
+        max_retries=int(os.getenv("NEWS_NER_MAX_RETRIES", "3")),
+    )
     run_ner_worker_loop(config)
 
 

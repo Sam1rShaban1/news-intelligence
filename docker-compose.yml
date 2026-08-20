@@ -56,6 +56,10 @@ services:
     environment:
       NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
       NEWS_LOG_LEVEL: INFO
+      OMP_NUM_THREADS: "2"
+      ORT_NUM_THREADS: "2"
+      NEWS_NER_POLL_INTERVAL: "2"
+      NEWS_NER_BATCH_SIZE: "50"
     volumes:
       - ./config:/app/config:ro
       - hf_cache:/root/.cache/huggingface
