@@ -2,9 +2,24 @@
 
 import logging
 
+import transformers
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+# gliner2_onnx loads its tokenizer via transformers.AutoTokenizer.from_pretrained
+# without fix_mistral_regex, which emits a warning for the underlying Mistral
+# tokenizer and can mis-tokenize. Patch it once (idempotent) so the flag is set.
+_orig_tokenizer_from_pretrained = getattr(transformers.AutoTokenizer, "_news_intel_orig", None)
+if _orig_tokenizer_from_pretrained is None:
+    _orig_tokenizer_from_pretrained = transformers.AutoTokenizer.from_pretrained
+    transformers.AutoTokenizer._news_intel_orig = _orig_tokenizer_from_pretrained
+
+    def _tokenizer_from_pretrained(pretrained_model_name_or_path, *args, **kwargs):
+        kwargs.setdefault("fix_mistral_regex", True)
+        return _orig_tokenizer_from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+
+    transformers.AutoTokenizer.from_pretrained = _tokenizer_from_pretrained
 
 # GLiNER label mapping — map model labels to our standard labels
 LABEL_MAP = {

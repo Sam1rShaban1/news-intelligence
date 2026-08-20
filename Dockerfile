@@ -31,7 +31,14 @@ RUN pip install --no-cache-dir \
     "langid>=1.1.6" \
     "beautifulsoup4>=4.12" \
     "pyyaml>=6.0" \
+    "nltk>=3.8" \
     "lxml"
+
+# Pre-download the NLTK corpora newspaper4k uses for richer author/keyword
+# extraction. Best-effort: a transient download failure must not break the
+# build — newspaper4k degrades gracefully without them.
+RUN python -m nltk.downloader -d /usr/share/nltk_data punkt punkt_tab averaged_perceptron_tagger || true
+ENV NLTK_DATA=/usr/share/nltk_data
 
 COPY . .
 

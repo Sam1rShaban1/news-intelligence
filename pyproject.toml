@@ -22,6 +22,7 @@ dependencies = [
     "langid>=1.1.6",
     "beautifulsoup4>=4.12",
     "pyyaml>=6.0",
+    "nltk>=3.8",
 ]
 
 [project.optional-dependencies]
