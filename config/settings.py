@@ -40,5 +40,24 @@ class Settings(BaseSettings):
     sentiment_model: str = "auto"
     sentiment_model_path: str = "/app/models/sentiment.onnx"
 
+    # API protection. If `api_key` is set, every API route (except /health) requires
+    # an `X-API-Key` header matching it. Leave empty to disable auth (single-tenant,
+    # behind a trusted reverse proxy).
+    api_key: str = ""
+
+    # Comma-separated list of allowed CORS origins for the browser UI. Use "*" to
+    # allow any origin, or a comma-separated list e.g. "http://localhost:8501".
+    cors_origins: str = "http://localhost:3000,http://localhost:8501,http://127.0.0.1:8501"
+
+    # Feature flags. A single image can run on a Raspberry Pi (heavy ML off) or a
+    # VPS (full features). The heavy libraries (onnxruntime, gliner2-onnx,
+    # tokenizers, pgvector) are only installed in the `vps` Docker target; when
+    # they are absent the features below self-disable, so these flags are a runtime
+    # safety switch on top of that. Set to "false" in docker-compose.pi.yml.
+    feature_ner: bool = True
+    feature_embeddings: bool = True
+    feature_pdf_export: bool = True
+    feature_alerts: bool = True
+
 
 settings = Settings()

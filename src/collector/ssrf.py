@@ -1,15 +1,27 @@
-"""SSRF guard for user-supplied feed URLs.
+"""SSRF guard for user-supplied URLs (feed URLs and article URLs).
 
-Source URLs are fetched by the worker, and (in single-operator mode) anyone
-reaching the API can add them. Before fetching, reject non-http(s) URLs and any
-host that resolves to a loopback / link-local / private address.
+Two layers of protection:
+
+1. `is_safe_url` — cheap parse-time check used when operators add a source. It
+   rejects non-http(s) URLs, URLs with credentials, and any host that resolves to
+   a private / loopback / link-local / reserved address. Unresolvable hosts are
+   allowed (the operator is responsible and the later fetch will simply fail).
+
+2. `safe_fetch` — used when fetching article content (untrusted URLs from feeds).
+   It resolves the host up front, pins the connection to that IP (so DNS rebinding
+   cannot redirect the socket to an internal address), validates *every* redirect
+   hop against the same blocklist, and never follows redirects automatically.
 """
 
+import dataclasses
+import http.client
 import ipaddress
 import socket
-from urllib.parse import urlparse
+import ssl
+import urllib.parse
+from typing import List, Tuple
 
-# Address ranges that must never be fetched from an untrusted feed URL.
+# Address ranges that must never be fetched from an untrusted URL.
 _BLOCKED_NETWORKS = [
     ipaddress.ip_network("10.0.0.0/8"),
     ipaddress.ip_network("172.16.0.0/12"),
@@ -22,32 +34,146 @@ _BLOCKED_NETWORKS = [
     ipaddress.ip_network("fe80::/10"),
 ]
 
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (compatible; NewsIntelligence/0.1; +https://github.com/news-intelligence)"
+)
+
+
+@dataclasses.dataclass
+class FetchResult:
+    status: int
+    headers: List[Tuple[str, str]]
+    body: bytes
+    final_url: str
+
+
+def _ip_is_blocked(addr: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    if (
+        ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_unspecified
+        or ip.is_private
+    ):
+        return True
+    return any(ip in net for net in _BLOCKED_NETWORKS)
+
+
+def _host_is_safe(hostname: str) -> bool:
+    """Resolve `hostname` and reject it if any address is blocked.
+
+    Returns False on resolution failure (fail closed: an unresolvable host is not
+    provably safe to fetch).
+    """
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except Exception:
+        return False
+    for info in infos:
+        if _ip_is_blocked(info[4][0]):
+            return False
+    return True
+
 
 def is_safe_url(url: str | None) -> bool:
-    """Return True only if `url` is http(s) and resolves to a public address."""
+    """Parse-time check for operator-supplied URLs (e.g. news sources).
+
+    Rejects non-http(s), credentialed URLs, and hosts that resolve to a blocked
+    address. Unresolvable hosts are allowed (the later fetch fails anyway).
+    """
     if not url:
         return False
     try:
-        parsed = urlparse(url)
+        parsed = urllib.parse.urlparse(url)
     except Exception:
         return False
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+    if parsed.scheme not in ("http", "https"):
+        return False
+    if parsed.username or parsed.password:
+        return False
+    if not parsed.hostname:
         return False
     try:
         infos = socket.getaddrinfo(parsed.hostname, None)
     except Exception:
-        # Unresolvable host: we can't prove it's unsafe, so allow it (the operator
-        # is responsible and the fetch will simply fail). Only resolved private /
-        # loopback addresses are blocked — that is the actual SSRF protection.
         return True
     for info in infos:
-        host = info[4][0]
-        try:
-            addr = ipaddress.ip_address(host)
-        except ValueError:
-            continue
-        if addr.is_loopback or addr.is_link_local or addr.is_multicast:
-            return False
-        if any(addr in net for net in _BLOCKED_NETWORKS):
+        if _ip_is_blocked(info[4][0]):
             return False
     return True
+
+
+def safe_fetch(
+    url: str,
+    *,
+    timeout: float = 15.0,
+    max_redirects: int = 5,
+    max_size: int = 5_000_000,
+    user_agent: str = DEFAULT_USER_AGENT,
+) -> FetchResult:
+    """Fetch a URL with SSRF protection.
+
+    - Validates the host against the blocklist on every hop.
+    - Pins the TCP/TLS connection to the pre-resolved IP (defeats DNS rebinding).
+    - Does NOT follow redirects automatically; each Location is re-validated.
+    """
+    current = url
+    for _ in range(max_redirects + 1):
+        parsed = urllib.parse.urlparse(current)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            raise ValueError(f"unsupported URL: {current}")
+        if not _host_is_safe(parsed.hostname):
+            raise ValueError(f"blocked host: {parsed.hostname}")
+
+        try:
+            infos = socket.getaddrinfo(parsed.hostname, None)
+        except Exception as e:
+            raise ValueError(f"unresolved host: {parsed.hostname} ({e})")
+        ip = next(
+            (info[4][0] for info in infos if not _ip_is_blocked(info[4][0])), None
+        )
+        if ip is None:
+            raise ValueError(f"no safe address for host: {parsed.hostname}")
+
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        path = parsed.path or "/"
+        if parsed.query:
+            path += "?" + parsed.query
+
+        try:
+            if parsed.scheme == "https":
+                ctx = ssl.create_default_context()
+                conn = http.client.HTTPSConnection(
+                    ip, port, timeout=timeout, context=ctx, server_hostname=parsed.hostname
+                )
+            else:
+                conn = http.client.HTTPConnection(ip, port, timeout=timeout)
+            conn.request(
+                "GET",
+                path,
+                headers={"Host": parsed.hostname, "User-Agent": user_agent},
+            )
+            resp = conn.getresponse()
+        except (socket.timeout, ssl.SSLError, OSError) as e:
+            raise ValueError(f"connection failed: {e}")
+
+        if resp.status in (301, 302, 303, 307, 308):
+            location = resp.getheader("Location")
+            resp.read()
+            conn.close()
+            if not location:
+                raise ValueError("redirect with no Location header")
+            current = urllib.parse.urljoin(current, location)
+            continue
+
+        body = resp.read(max_size)
+        conn.close()
+        return FetchResult(
+            status=resp.status, headers=resp.getheaders(), body=body, final_url=current
+        )
+
+    raise ValueError("too many redirects")

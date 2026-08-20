@@ -21,7 +21,7 @@ from src.db.models import Base  # noqa: E402
 from src.db.session import engine  # noqa: E402
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def _schema() -> None:
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
@@ -32,3 +32,19 @@ def _schema() -> None:
 @pytest.fixture()
 def client(_schema) -> TestClient:
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_tests():
+    """Truncate every table after each test so tests never leak rows to each other."""
+    yield
+    from src.db.models import Base
+
+    with engine.begin() as conn:
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "TRUNCATE TABLE "
+                + ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
+                + " RESTART IDENTITY CASCADE"
+            )
+        )

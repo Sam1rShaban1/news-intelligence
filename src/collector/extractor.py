@@ -7,6 +7,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from config.settings import settings
+from src.collector.ssrf import safe_fetch
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ def _get_client() -> httpx.Client:
         _client = httpx.Client(
             timeout=settings.http_timeout,
             headers={"User-Agent": settings.user_agent},
-            follow_redirects=True,
+            follow_redirects=False,
         )
     return _client
 
@@ -36,11 +37,11 @@ def extract_with_newspaper(url: str) -> dict[str, Any] | None:
     try:
         import newspaper
 
+        result = safe_fetch(url)
         article = newspaper.Article(url, language="en")
-        article.download()
+        article.set_html(result.body.decode("utf-8", "replace"))
         article.parse()
 
-        # newspaper4k populates these after parse()
         text = article.text or ""
         if len(text.strip()) < 50:
             return None
@@ -60,15 +61,16 @@ def extract_with_newspaper(url: str) -> dict[str, Any] | None:
 
 def extract_with_bs4(url: str) -> dict[str, Any] | None:
     """BeautifulSoup fallback extraction."""
-    client = _get_client()
     try:
-        resp = client.get(url)
-        resp.raise_for_status()
-    except httpx.HTTPError as e:
-        logger.debug("BS4 fetch failed for %s: %s", url, e)
+        result = safe_fetch(url)
+        if result.status >= 400:
+            logger.debug("BS4 fetch failed for %s: HTTP %s", url, result.status)
+            return None
+    except ValueError as e:
+        logger.debug("BS4 fetch blocked for %s: %s", url, e)
         return None
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(result.body.decode("utf-8", "replace"), "html.parser")
 
     # Title
     title = ""
@@ -78,11 +80,9 @@ def extract_with_bs4(url: str) -> dict[str, Any] | None:
     # Main content: try <article>, then <main>, then largest <div>
     content_el = soup.find("article") or soup.find("main")
     if not content_el:
-        # Find the div with the most paragraph text
         paragraphs = soup.find_all("p")
         if not paragraphs:
             return None
-        # Group by parent
         parent_counts: dict[Any, int] = {}
         for p in paragraphs:
             parent = p.parent
@@ -91,14 +91,12 @@ def extract_with_bs4(url: str) -> dict[str, Any] | None:
         if content_el is None:
             return None
 
-    # Extract text from paragraphs
     paragraphs = content_el.find_all(["p", "h2", "h3", "li"])
     text = "\n\n".join(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True))
 
     if len(text.strip()) < 50:
         return None
 
-    # Author
     author = None
     meta_author = soup.find("meta", attrs={"name": "author"})
     if meta_author:
@@ -108,7 +106,6 @@ def extract_with_bs4(url: str) -> dict[str, Any] | None:
         if byline:
             author = byline.get_text(strip=True)[:200]
 
-    # Summary
     summary = ""
     meta_desc = soup.find("meta", attrs={"name": "description"})
     if meta_desc:
