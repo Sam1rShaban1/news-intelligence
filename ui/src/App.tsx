@@ -7,6 +7,7 @@ import { Entities } from './views/Entities'
 import { Graph } from './views/Graph'
 import { Stories } from './views/Stories'
 import { Sources } from './views/Sources'
+import { Alerts } from './views/Alerts'
 
 export default function App() {
   const [view, setView] = useState<View>('overview')
@@ -32,6 +33,7 @@ export default function App() {
       {view === 'entities' && <Entities />}
       {view === 'graph' && <Graph />}
       {view === 'stories' && <Stories />}
+      {view === 'alerts' && <Alerts />}
       {view === 'sources' && <Sources />}
     </Layout>
   )

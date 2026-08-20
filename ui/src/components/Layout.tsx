@@ -1,6 +1,6 @@
 import { type ReactNode, type CSSProperties } from 'react'
 
-export type View = 'overview' | 'explore' | 'sentiment' | 'entities' | 'graph' | 'stories' | 'sources'
+export type View = 'overview' | 'explore' | 'sentiment' | 'entities' | 'graph' | 'stories' | 'sources' | 'alerts'
 
 const NAV = [
   { id: 'overview' as View, label: 'OVERVIEW', glyph: '◉' },
@@ -9,6 +9,7 @@ const NAV = [
   { id: 'entities' as View, label: 'ENTITIES', glyph: '◈' },
   { id: 'graph' as View, label: 'GRAPH', glyph: '⬡' },
   { id: 'stories' as View, label: 'STORIES', glyph: '▤' },
+  { id: 'alerts' as View, label: 'ALERTS', glyph: '◬' },
   { id: 'sources' as View, label: 'SOURCES', glyph: '⌁' },
 ]
 
