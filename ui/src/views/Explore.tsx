@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../lib/api'
-import { Section, Card, SentimentChip, LangBadge, SkelArticleRows, EmptyState } from '../components/Layout'
+import { Section, Card, SentimentChip, LangBadge, SkelArticleRows, EmptyState, LoadingDots } from '../components/Layout'
 
 const LANGS = ['mk', 'sq', 'en', 'tr']
 const SENTIMENTS = ['positive', 'neutral', 'negative']
@@ -16,6 +16,7 @@ export function Explore({ initialQuery }: { initialQuery: string }) {
   const [results, setResults] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
+  const [detail, setDetail] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const acRef = useRef<AbortController | null>(null)
 
@@ -124,14 +125,27 @@ export function Explore({ initialQuery }: { initialQuery: string }) {
           </div>
         </Card>
 
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+          <span style={{ fontSize: 8, letterSpacing: '0.12em', color: '#555550' }}>EXPORT</span>
+          <a href={api.exportSearchUrl({ q: q || undefined, language: lang.length ? lang.join(',') : undefined, sentiment: sentiment || undefined }, 'csv')} target="_blank" rel="noreferrer"
+            style={{ fontSize: 9, padding: '3px 10px', border: '1px solid #0a0a0a', background: '#f5f5f0', letterSpacing: '0.1em', color: '#0a0a0a', textDecoration: 'none', cursor: 'pointer', fontWeight: 700 }}>
+            CSV
+          </a>
+          <a href={api.exportSearchUrl({ q: q || undefined, language: lang.length ? lang.join(',') : undefined, sentiment: sentiment || undefined }, 'json')} target="_blank" rel="noreferrer"
+            style={{ fontSize: 9, padding: '3px 10px', border: '1px solid #0a0a0a', background: '#f5f5f0', letterSpacing: '0.1em', color: '#0a0a0a', textDecoration: 'none', cursor: 'pointer', fontWeight: 700 }}>
+            JSON
+          </a>
+          <span style={{ fontSize: 8, color: '#555550', marginLeft: 'auto' }}>CLICK A RESULT FOR DETAIL</span>
+        </div>
+
         {loading ? <SkelArticleRows count={6} /> : error ? (
           <EmptyState msg="COULD NOT REACH API — CHECK BACKEND CONNECTION" />
         ) : !results ? null : (
           <>
             <Card style={{ padding: 0 }}>
               {results.results?.length ? results.results.map((r: any, i: number) => (
-                <div key={r.id} style={{ padding: '12px 14px', borderBottom: i < results.results.length - 1 ? '1px solid #d4d4cc' : 'none' }}>
-                  <a href={r.url} target="_blank" rel="noreferrer"
+                <div key={r.id} style={{ padding: '12px 14px', borderBottom: i < results.results.length - 1 ? '1px solid #d4d4cc' : 'none', cursor: 'pointer' }} onClick={() => setDetail(String(r.id))}>
+                  <a href={r.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
                     style={{ fontSize: 13, fontWeight: 700, color: '#0a0a0a', textDecoration: 'none', lineHeight: 1.3, display: 'block', marginBottom: 5 }}>
                     {r.title}
                   </a>
@@ -185,6 +199,80 @@ export function Explore({ initialQuery }: { initialQuery: string }) {
           </>
         )}
       </Section>
+
+      {detail && <ArticleDrawer id={detail} onClose={() => setDetail(null)} />}
+    </div>
+  )
+}
+
+function ArticleDrawer({ id, onClose }: { id: string; onClose: () => void }) {
+  const [a, setA] = useState<any>(null)
+
+  useEffect(() => {
+    setA(null)
+    api.article(id).then(setA).catch(() => setA({ error: true }))
+  }, [id])
+
+  if (!id) return null
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', justifyContent: 'flex-end' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ width: '100%', maxWidth: 520, height: '100%', background: '#f5f5f0', borderLeft: '2px solid #0a0a0a', boxShadow: '-6px 0 0 #0a0a0a', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ padding: '14px 16px', borderBottom: '2px solid #0a0a0a', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 8, letterSpacing: '0.15em', color: '#555550', marginBottom: 4 }}>◉ ARTICLE</div>
+            {a ? (
+              <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>
+                {a.error ? 'COULD NOT LOAD ARTICLE' : (a.title || '(untitled)')}
+              </div>
+            ) : <div style={{ fontSize: 16, fontWeight: 700 }}>…</div>}
+          </div>
+          <button onClick={onClose} style={{ fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>×</button>
+        </div>
+
+        {!a ? <div style={{ padding: 16 }}><LoadingDots /></div> : a.error ? null : (
+          <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {a.language && <LangBadge lang={a.language} />}
+              {a.sentiment_label && <SentimentChip label={a.sentiment_label} />}
+              {a.source_name && <span style={{ fontSize: 9, color: '#555550' }}>{a.source_name}</span>}
+              {a.published_date && <span style={{ fontSize: 8, color: '#555550', marginLeft: 'auto' }}>{a.published_date.slice(0, 10)}</span>}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <a href={api.articlePdfUrl(id)} target="_blank" rel="noreferrer"
+                style={{ fontSize: 9, padding: '4px 12px', border: '1px solid #0a0a0a', background: '#0a0a0a', color: '#f5f5f0', letterSpacing: '0.1em', textDecoration: 'none', cursor: 'pointer', fontWeight: 700 }}>
+                PDF
+              </a>
+              <a href={a.url} target="_blank" rel="noreferrer"
+                style={{ fontSize: 9, padding: '4px 12px', border: '1px solid #0a0a0a', background: '#f5f5f0', letterSpacing: '0.1em', color: '#0a0a0a', textDecoration: 'none', cursor: 'pointer', fontWeight: 700 }}>
+                OPEN SOURCE
+              </a>
+            </div>
+
+            {a.summary && (
+              <div>
+                <div style={{ fontSize: 9, letterSpacing: '0.12em', color: '#555550', marginBottom: 4 }}>SUMMARY</div>
+                <p style={{ fontSize: 11, lineHeight: 1.55, margin: 0, color: '#0a0a0a' }}>{a.summary}</p>
+              </div>
+            )}
+            {a.content && (
+              <div>
+                <div style={{ fontSize: 9, letterSpacing: '0.12em', color: '#555550', marginBottom: 4 }}>BODY</div>
+                <p style={{ fontSize: 10, lineHeight: 1.6, margin: 0, color: '#0a0a0a', whiteSpace: 'pre-wrap' }}>{a.content}</p>
+              </div>
+            )}
+            {!a.summary && !a.content && (
+              <EmptyState msg="NO TEXT AVAILABLE FOR THIS ARTICLE" />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
