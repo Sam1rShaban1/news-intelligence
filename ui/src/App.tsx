@@ -8,6 +8,7 @@ import { Graph } from './views/Graph'
 import { Stories } from './views/Stories'
 import { Sources } from './views/Sources'
 import { Alerts } from './views/Alerts'
+import { Watchlist } from './views/Watchlist'
 
 export default function App() {
   const [view, setView] = useState<View>('overview')
@@ -27,12 +28,13 @@ export default function App() {
 
   return (
     <Layout view={view} onNav={setView} search={search} onSearch={handleSearch} online={online}>
-      {view === 'overview' && <Overview search={search} />}
+      {view === 'overview' && <Overview search={search} onNav={setView} />}
       {view === 'explore' && <Explore initialQuery={search} />}
       {view === 'sentiment' && <Sentiment />}
       {view === 'entities' && <Entities />}
       {view === 'graph' && <Graph />}
       {view === 'stories' && <Stories />}
+      {view === 'watchlist' && <Watchlist />}
       {view === 'alerts' && <Alerts />}
       {view === 'sources' && <Sources />}
     </Layout>
