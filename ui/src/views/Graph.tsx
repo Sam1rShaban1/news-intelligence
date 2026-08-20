@@ -188,6 +188,9 @@ export function Graph() {
   useEffect(() => { selectedRef.current = selected; dirtyRef.current = true }, [selected])
   useEffect(() => { focusRef.current = focusId; dirtyRef.current = true }, [focusId])
   useEffect(() => { focusClusterRef.current = focusCluster; dirtyRef.current = true }, [focusCluster])
+  // When a node is isolated, keep the isolation locked to whatever node is
+  // currently selected (so clicking another node re-focuses the isolate view).
+  useEffect(() => { if (focusId && selected) setFocusId(selected.id) }, [selected])
 
   const nodeRadius = (n: GraphNode) => 5 + (n.weight / (maxNodeWRef.current || 1)) * 14
 
@@ -217,6 +220,8 @@ export function Graph() {
     workerRef.current?.terminate()
     workerRef.current = null
 
+    const controller = new AbortController()
+    let cancelled = false
     let worker: Worker | null = null
     let stopFallback: (() => void) | null = null
     let layoutStarted = false
@@ -297,8 +302,12 @@ export function Graph() {
         }
     }
 
-    api.graphCooccurrence({ node_limit: nodeLimit === 0 ? 0 : nodeLimit, min_weight: 1, label: labelFilter !== 'ALL' ? labelFilter : undefined })
+    api.graphCooccurrence(
+      { node_limit: nodeLimit === 0 ? 0 : nodeLimit, min_weight: 1, label: labelFilter !== 'ALL' ? labelFilter : undefined },
+      controller.signal,
+    )
       .then((r: any) => {
+        if (cancelled) return
         // One-pass node map (O(E), was O(E^2) via per-endpoint r.edges.find)
         const nodeInfo = new Map<string, { text: string; label: string }>()
         const cleanEdges: GraphEdge[] = []
@@ -355,10 +364,14 @@ export function Graph() {
           )
         }
       })
-      .catch(() => setGraphError(true))
-    api.graphStats().then(setStats).catch(() => setStats(null))
+      .catch((e: any) => { if (!cancelled && e?.name !== 'AbortError') setGraphError(true) })
+    api.graphStats(controller.signal)
+      .then((s: any) => { if (!cancelled) setStats(s) })
+      .catch(() => { if (!cancelled) setStats(null) })
 
     return () => {
+      cancelled = true
+      controller.abort()
       if (watchdog) clearTimeout(watchdog)
       worker?.terminate()
       stopFallback?.()

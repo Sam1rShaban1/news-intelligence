@@ -5,6 +5,7 @@ enable/disable, soft-delete, and test feeds from the UI. The YAML seed remains
 only as initial bootstrap. No auth in this build (multi-tenant auth is planned).
 """
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
@@ -35,11 +36,73 @@ class SourceUpdate(BaseModel):
     enabled: bool | None = None
 
 
-def _serialize(db: Session, source: Source) -> dict:
+def _credibility_map(db: Session) -> dict[int, dict]:
+    """Compute reliability signals per source from article outcome counts.
+
+    Returns {source_id: {articles_total, failed, duplicate, success,
+    failure_rate, duplicate_rate, reliability}}.
+    """
+    rows = db.execute(
+        select(
+            Article.source_id,
+            func.count(Article.id).label("total"),
+            func.count(Article.id).filter(Article.status == "failed").label("failed"),
+            func.count(Article.id).filter(Article.status == "duplicate").label("duplicate"),
+        ).group_by(Article.source_id)
+    ).all()
+    out: dict[int, dict] = {}
+    for r in rows:
+        total = r.total or 0
+        failed = r.failed or 0
+        dup = r.duplicate or 0
+        failure_rate = failed / total if total else 0.0
+        dup_rate = dup / total if total else 0.0
+        reliability = (1 - failure_rate) * (1 - dup_rate)
+        out[r.source_id] = {
+            "articles_total": total,
+            "failed": failed,
+            "duplicate": dup,
+            "success": total - failed - dup,
+            "failure_rate": round(failure_rate, 4),
+            "duplicate_rate": round(dup_rate, 4),
+            "reliability": round(reliability, 4),
+        }
+    return out
+
+
+def _score_source(source: Source, stats: dict | None) -> dict:
+    """Combine reliability with feed-recency into a 0-100 credibility score."""
+    now = datetime.now(timezone.utc)
+    reliability = stats["reliability"] if stats else 0.0
+    if source.last_scanned_at is None:
+        recency = 0.7  # unknown — slight penalty, not a hard fail
+    else:
+        days = (now - source.last_scanned_at).days
+        recency = max(0.5, 1 - days / 30.0)
+    score = round(100.0 * reliability * recency, 1)
+    grade = (
+        "A" if score >= 85 else
+        "B" if score >= 70 else
+        "C" if score >= 50 else
+        "D" if score >= 30 else "F"
+    )
+    return {
+        "score": score,
+        "grade": grade,
+        "recency_factor": round(recency, 4),
+        "articles_total": stats["articles_total"] if stats else 0,
+        "failed": stats["failed"] if stats else 0,
+        "duplicate": stats["duplicate"] if stats else 0,
+        "failure_rate": stats["failure_rate"] if stats else 0.0,
+        "duplicate_rate": stats["duplicate_rate"] if stats else 0.0,
+    }
+
+
+def _serialize(db: Session, source: Source, cred: dict[int, dict] | None = None) -> dict:
     article_count = db.scalar(
         select(func.count(Article.id)).where(Article.source_id == source.id)
     )
-    return {
+    result = {
         "id": source.id,
         "name": source.name,
         "url": source.url,
@@ -53,6 +116,9 @@ def _serialize(db: Session, source: Source) -> dict:
             source.last_scanned_at.isoformat() if source.last_scanned_at else None
         ),
     }
+    if cred is not None:
+        result["credibility"] = _score_source(source, cred.get(source.id))
+    return result
 
 
 @router.get("")
@@ -67,7 +133,27 @@ def list_sources(
     if enabled is not None:
         query = query.where(Source.enabled.is_(enabled))
     sources = db.execute(query.order_by(Source.name)).scalars().all()
-    return {"sources": [_serialize(db, s) for s in sources]}
+    cred = _credibility_map(db)
+    return {"sources": [_serialize(db, s, cred) for s in sources]}
+
+
+@router.get("/credibility")
+def source_credibility(db: Session = Depends(get_db)) -> dict:
+    """Credibility scoring across all sources: reliability (failure/duplicate rates)
+    combined with feed-recency into a 0-100 score and letter grade."""
+    sources = db.execute(select(Source).order_by(Source.name)).scalars().all()
+    cred = _credibility_map(db)
+    return {
+        "sources": [
+            {
+                "id": s.id,
+                "name": s.name,
+                "enabled": s.enabled,
+                "credibility": _score_source(s, cred.get(s.id)),
+            }
+            for s in sources
+        ]
+    }
 
 
 @router.post("")
@@ -94,12 +180,13 @@ def create_source(payload: SourceCreate, db: Session = Depends(get_db)) -> dict:
 @router.patch("/{source_id}")
 def update_source(
     source_id: int = Path(..., description="Source id"),
-    payload: SourceUpdate = None,
+    payload: SourceUpdate | None = None,
     db: Session = Depends(get_db),
 ) -> dict:
     source = db.get(Source, source_id)
     if source is None or source.deleted:
         raise HTTPException(status_code=404, detail="source not found")
+    payload = payload or SourceUpdate()
     if payload.url is not None:
         if not is_safe_url(payload.url):
             raise HTTPException(status_code=400, detail="URL must be http(s) and reachable")

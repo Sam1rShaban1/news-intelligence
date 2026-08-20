@@ -1,13 +1,17 @@
 const BASE = '/api'
 
-async function get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+async function get<T>(
+  path: string,
+  params?: Record<string, string | number | undefined>,
+  signal?: AbortSignal,
+): Promise<T> {
   const url = new URL(BASE + path, window.location.origin)
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined && v !== '') url.searchParams.set(k, String(v))
     }
   }
-  const res = await fetch(url.toString())
+  const res = await fetch(url.toString(), signal ? { signal } : undefined)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }
@@ -40,9 +44,11 @@ export const api = {
   entityArticles: (id: string, limit = 10) => get<any>(`/entities/${id}/articles`, { limit }),
   entityRelations: (id: string, limit = 20) => get<any>(`/entities/${id}/relationships`, { limit }),
   entityNode: (id: string) => get<any>(`/entities/nodes/${id}`),
-  graphCooccurrence: (opts?: { node_limit?: number; limit?: number; min_weight?: number; label?: string }) =>
-    get<any>('/graph/cooccurrence', opts as any),
-  graphStats: () => get<any>('/graph/stats'),
+  graphCooccurrence: (
+    opts?: { node_limit?: number; limit?: number; min_weight?: number; label?: string },
+    signal?: AbortSignal,
+  ) => get<any>('/graph/cooccurrence', opts as any, signal),
+  graphStats: (signal?: AbortSignal) => get<any>('/graph/stats', undefined, signal),
   stories: (opts?: Record<string, string | number | undefined>) =>
     get<any>('/stories', opts),
   story: (id: string) => get<any>(`/stories/${id}`),
@@ -58,4 +64,23 @@ export const api = {
     mutate<any>(`/sources/${id}`, 'DELETE'),
   testSource: (id: string) =>
     mutate<any>(`/sources/${id}/test`, 'POST'),
+
+  // Alerts (Phase 4)
+  alertRules: () => get<any>('/alerts/rules'),
+  createAlertRule: (body: { name: string; query?: string; entity_node_id?: number; languages?: string[]; min_sentiment?: number }) =>
+    mutate<any>('/alerts/rules', 'POST', body),
+  deleteAlertRule: (id: number) =>
+    mutate<any>(`/alerts/rules/${id}`, 'DELETE'),
+  alerts: (opts?: { limit?: number; read?: boolean }) =>
+    get<any>('/alerts', opts as any),
+  markAlertRead: (id: number) =>
+    mutate<any>(`/alerts/${id}/read`, 'POST'),
+  markAllAlertsRead: () =>
+    mutate<any>('/alerts/read-all', 'POST'),
+
+  // Semantic search + PDF export (Phase 4)
+  semanticSearch: (body: { text: string; limit?: number; language?: string }) =>
+    mutate<any>('/search/semantic', 'POST', body),
+  articlePdfUrl: (id: string) => `${BASE}/export/articles/${id}/pdf`,
+  storyPdfUrl: (id: string) => `${BASE}/export/stories/${id}/pdf`,
 }

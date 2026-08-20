@@ -77,6 +77,16 @@ def test_toggle_and_soft_delete(client):
     assert any(s["id"] == sid for s in listed_all)
 
 
+def test_patch_empty_body_does_not_500(client):
+    with SessionLocal() as db:
+        sid = _make(db, url="https://empty.example.com")
+
+    # Empty body used to raise 500 (payload was None). Must be handled gracefully.
+    r = client.patch(f"/sources/{sid}", json={})
+    assert r.status_code == 200
+    assert r.json()["id"] == sid
+
+
 def test_test_endpoint_uses_discovery(monkeypatch):
     import src.api.routes.sources as sroute
 

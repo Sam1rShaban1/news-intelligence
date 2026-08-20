@@ -39,6 +39,7 @@ def analytics_overview(
     )
     if language:
         sot = sot.where(Article.language == language)
+    sot = sot.where(Article.status.notin_(["failed", "duplicate"]))
     sot = sot.group_by("bucket", Article.sentiment_label).order_by("bucket")
     sot_rows = db.execute(sot).all()
 
@@ -62,6 +63,7 @@ def analytics_overview(
     )
     if language:
         lm = lm.where(Article.language == language)
+    lm = lm.where(Article.status.notin_(["failed", "duplicate"]))
     lm = lm.group_by("bucket", Article.language).order_by("bucket")
     lm_rows = db.execute(lm).all()
 
