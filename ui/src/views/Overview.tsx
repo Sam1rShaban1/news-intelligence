@@ -9,6 +9,7 @@ import {
   Section, Card, KpiTile, SentimentChip, LangBadge,
   SkelKpiRow, SkelChartArea, SkelArticleRows, EmptyState,
 } from '../components/Layout'
+import type { View } from '../components/Layout'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function shortDate(iso?: string): string {
@@ -19,11 +20,13 @@ function shortDate(iso?: string): string {
   return `${MONTHS[m]} ${d}`
 }
 
-export function Overview({ search: _search }: { search: string }) {
+export function Overview({ search: _search, onNav }: { search: string; onNav?: (v: View) => void }) {
   const [data, setData] = useState<any>(null)
   const [dataError, setDataError] = useState(false)
   const [recentArticles, setRecentArticles] = useState<any[] | null>(null)
   const [articleStats, setArticleStats] = useState<{ total: number; analyzed: number } | null>(null)
+  const [watchlist, setWatchlist] = useState<any[] | null>(null)
+  const [alerts, setAlerts] = useState<any>(null)
 
   useEffect(() => {
     const ac = new AbortController()
@@ -39,6 +42,8 @@ export function Overview({ search: _search }: { search: string }) {
     ]).then(([all, done]: any) => {
       if (!ac.signal.aborted) setArticleStats({ total: all.total ?? 0, analyzed: done.total ?? 0 })
     }).catch(() => { if (!ac.signal.aborted) setArticleStats(null) })
+    api.watchlist().then((r: any) => { if (!ac.signal.aborted) setWatchlist(r.items ?? []) }).catch(() => {})
+    api.alerts({ limit: 5 }).then((r: any) => { if (!ac.signal.aborted) setAlerts(r) }).catch(() => {})
     return () => ac.abort()
   }, [])
 
@@ -189,6 +194,46 @@ export function Overview({ search: _search }: { search: string }) {
                 </div>
               </a>
             ))}
+          </Card>
+        </Section>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <Section title="WATCHLIST" sub="MONITORED ENTITIES" onAction={onNav ? { label: 'OPEN', onClick: () => onNav('watchlist') } : undefined}>
+          <Card style={{ padding: 0 }}>
+            {watchlist === null ? <SkelArticleRows count={4} /> :
+             watchlist.length === 0 ? <EmptyState msg="NO WATCHED ENTITIES — ADD FROM ENTITIES" /> :
+             watchlist.slice(0, 6).map((w: any, i: number) => (
+               <button key={w.id} onClick={() => onNav?.('watchlist')}
+                 style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 14px', border: 'none', borderBottom: i < Math.min(watchlist.length, 6) - 1 ? '1px solid #d4d4cc' : 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                 <span style={{ fontSize: 9, color: '#555550', width: 16, fontVariantNumeric: 'tabular-nums' }}>{String(i + 1).padStart(2, '0')}</span>
+                 <span style={{ flex: 1, fontSize: 11, fontWeight: 700 }}>{w.entity_text}</span>
+                 <span style={{ fontSize: 8, padding: '1px 4px', border: '1px solid #0a0a0a', letterSpacing: '0.1em', color: '#555550' }}>{w.entity_label}</span>
+                 {w.last_mentioned && <span style={{ fontSize: 8, color: '#555550', width: 48, textAlign: 'right' }}>{w.last_mentioned.slice(0, 10)}</span>}
+               </button>
+             ))}
+          </Card>
+        </Section>
+
+        <Section title="ALERTS" sub="UNREAD / RECENT" onAction={onNav ? { label: 'OPEN', onClick: () => onNav('alerts') } : undefined}>
+          <Card style={{ padding: 0 }}>
+            {alerts === null ? <SkelArticleRows count={4} /> :
+             (alerts.unread ?? 0) > 0 || (alerts.items?.length ?? 0) > 0 ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid #d4d4cc' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700 }}>{alerts.unread ?? 0} UNREAD</span>
+                  <span style={{ fontSize: 8, color: '#555550', marginLeft: 'auto' }}>{alerts.total ?? 0} TOTAL</span>
+                </div>
+                {(alerts.items ?? []).slice(0, 5).map((a: any, i: number) => (
+                  <button key={a.id} onClick={() => onNav?.('alerts')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', border: 'none', borderBottom: i < Math.min(alerts.items.length, 5) - 1 ? '1px solid #d4d4cc' : 'none', background: a.read ? 'none' : '#e8e8e0', cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ fontSize: 8, padding: '1px 4px', border: '1px solid #0a0a0a', letterSpacing: '0.1em', color: '#555550' }}>{(a.channel ?? 'email').toUpperCase()}</span>
+                    <span style={{ flex: 1, fontSize: 11, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.subject}</span>
+                    {a.fired_at && <span style={{ fontSize: 8, color: '#555550' }}>{a.fired_at.slice(0, 10)}</span>}
+                  </button>
+                ))}
+              </>
+            ) : <EmptyState msg="NO ALERTS YET" />}
           </Card>
         </Section>
       </div>
