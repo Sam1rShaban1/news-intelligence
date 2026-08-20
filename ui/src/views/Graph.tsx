@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { zoom, zoomIdentity } from 'd3-zoom'
 import type { ZoomBehavior, ZoomTransform } from 'd3-zoom'
 import { select } from 'd3-selection'
@@ -152,6 +153,7 @@ export function Graph() {
   const [sidebarLoading, setSidebarLoading] = useState(false)
   const [nodeDetail, setNodeDetail] = useState<any | null>(null)
   const [focusId, setFocusId] = useState<string | null>(null)
+  const [focusCluster, setFocusCluster] = useState<number | null>(null)
   const [, setLayoutTick] = useState(0)
 
   // Animation / interaction refs
@@ -174,6 +176,7 @@ export function Graph() {
   const anchorRef = useRef<Map<number, { x: number; y: number }>>(new Map())
   const maxNodeWRef = useRef(1)
   const focusRef = useRef<string | null>(null)
+  const focusClusterRef = useRef<number | null>(null)
   const rafRef = useRef<number | undefined>(undefined)
 
   const clusterAnyNode = (c: number): string => {
@@ -184,6 +187,7 @@ export function Graph() {
   useEffect(() => { colorModeRef.current = colorMode; dirtyRef.current = true }, [colorMode])
   useEffect(() => { selectedRef.current = selected; dirtyRef.current = true }, [selected])
   useEffect(() => { focusRef.current = focusId; dirtyRef.current = true }, [focusId])
+  useEffect(() => { focusClusterRef.current = focusCluster; dirtyRef.current = true }, [focusCluster])
 
   const nodeRadius = (n: GraphNode) => 5 + (n.weight / (maxNodeWRef.current || 1)) * 14
 
@@ -462,10 +466,12 @@ export function Graph() {
       const highlight = neighborsSet(activeId)
       const focus = focusRef.current
       const visible = focus ? neighborsSet(focus) : null
+      const onlyCluster = focusClusterRef.current
 
       // ── Cluster hull regions ──
       for (const [c, pts] of hullsRef.current) {
         if (visible && !visible.has(clusterAnyNode(c))) continue
+        if (onlyCluster != null && c !== onlyCluster) continue
         ctx.beginPath()
         pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))
         ctx.closePath()
@@ -485,6 +491,10 @@ export function Graph() {
         let alpha = 0.2 + (e.weight / maxW) * 0.45
         const isActive = highlight && highlight.has(a.id) && highlight.has(b.id)
         if (highlight && !isActive) alpha = 0.05
+        if (onlyCluster != null) {
+          const inFocus = a.cluster === onlyCluster && b.cluster === onlyCluster
+          if (!inFocus) alpha = Math.min(alpha, 0.04)
+        }
         ctx.save()
         ctx.globalAlpha = alpha
         ctx.strokeStyle = '#0a0a0a'
@@ -503,7 +513,8 @@ export function Graph() {
         const r = nodeRadius(n)
         const color = nodeColor(n, colorModeRef.current)
         const isActive = n.id === isHov || n.id === isSel
-        const dim = (highlight && !highlight.has(n.id)) ? 0.18 : 1
+        let dim = (highlight && !highlight.has(n.id)) ? 0.18 : 1
+        if (onlyCluster != null && n.cluster !== onlyCluster) dim = 0.07
 
         ctx.save()
         ctx.translate(n.x, n.y)
@@ -532,7 +543,8 @@ export function Graph() {
         }
 
         // Labels: top nodes, active, neighbors of active
-        const showLabel = n.id === isHov || n.id === isSel || topLabelRef.current.has(n.id) || (highlight && highlight.has(n.id) && !isActive)
+        const inOtherCluster = onlyCluster != null && n.cluster !== onlyCluster
+        const showLabel = (n.id === isHov || n.id === isSel) || (!inOtherCluster && (topLabelRef.current.has(n.id) || (highlight && highlight.has(n.id) && !isActive)))
         if (showLabel) {
           ctx.save()
           ctx.globalAlpha = dim < 1 ? dim : 1
@@ -599,7 +611,7 @@ export function Graph() {
       .catch(() => setNodeDetail(null))
   }, [hitTest])
 
-  const legendEntries: { label: string; fg: Rgb; density: number }[] = (() => {
+  const legendEntries: { label: string; fg: Rgb; density: number; clusterIndex?: number }[] = (() => {
     if (colorMode === 'type') return [
       { label: 'PERSON', fg: COLORS.blue, density: 0.72 },
       { label: 'ORGANISATION', fg: COLORS.orange, density: 0.72 },
@@ -615,6 +627,7 @@ export function Graph() {
       label: `${c.repr} · ${c.count}`,
       fg: CLUSTER_PALETTE[c.index % CLUSTER_PALETTE.length],
       density: 0.72,
+      clusterIndex: c.index,
     }))
   })()
 
@@ -706,26 +719,66 @@ export function Graph() {
       {/* Legend */}
       <div style={{
         position: 'absolute', bottom: 12, left: 12, zIndex: 6,
-        background: 'rgba(245,245,240,0.92)', border: '1px solid #0a0a0a',
-        padding: '8px 10px', fontSize: 8, letterSpacing: '0.09em', maxHeight: 240, overflowY: 'auto',
+        background: 'rgba(245,245,240,0.95)', border: '2px solid #0a0a0a',
+        padding: '10px 12px', fontSize: 10, letterSpacing: '0.08em', maxHeight: 320, overflowY: 'auto',
+        boxShadow: '3px 3px 0 #0a0a0a',
       }}>
-        <div style={{ fontWeight: 700, marginBottom: 5, letterSpacing: '0.15em' }}>SHAPE = TYPE</div>
-        <div style={{ marginBottom: 2 }}>● PERSON (PER)</div>
-        <div style={{ marginBottom: 2 }}>■ ORGANISATION (ORG)</div>
-        <div style={{ marginBottom: 5 }}>▲ LOCATION (LOC)</div>
-        <div style={{ fontWeight: 700, marginBottom: 5, letterSpacing: '0.15em', borderTop: '1px dashed #0a0a0a', paddingTop: 5 }}>
+        <div style={{ fontWeight: 700, marginBottom: 6, letterSpacing: '0.15em' }}>SHAPE = TYPE</div>
+        <div style={{ marginBottom: 3 }}>● PERSON (PER)</div>
+        <div style={{ marginBottom: 3 }}>■ ORGANISATION (ORG)</div>
+        <div style={{ marginBottom: 6 }}>▲ LOCATION (LOC)</div>
+        <div style={{ fontWeight: 700, marginBottom: 6, letterSpacing: '0.15em', borderTop: '1px dashed #0a0a0a', paddingTop: 6 }}>
           FILL = {COLOR_MODE_LABELS[colorMode]}
+          {colorMode === 'cluster' && <span style={{ fontWeight: 400, opacity: 0.6 }}> · CLICK TO ISOLATE</span>}
         </div>
-        {legendEntries.map((le, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-            <ColorSwatch fg={le.fg} density={le.density} />
-            <span>{le.label}</span>
-          </div>
-        ))}
+        {colorMode === 'cluster' && focusCluster != null && (
+          <div
+            onClick={() => setFocusCluster(null)}
+            style={{ cursor: 'pointer', fontWeight: 700, marginBottom: 6, letterSpacing: '0.1em', textDecoration: 'underline' }}
+          >◀ SHOW ALL CLUSTERS</div>
+        )}
+        {legendEntries.map((le, i) => {
+          const isClusterSel = le.clusterIndex != null && le.clusterIndex === focusCluster
+          const clickable = le.clusterIndex != null
+          return (
+            <div
+              key={i}
+              onClick={clickable ? () => setFocusCluster(isClusterSel ? null : le.clusterIndex!) : undefined}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3,
+                cursor: clickable ? 'pointer' : 'default',
+                background: isClusterSel ? '#0a0a0a' : 'transparent',
+                color: isClusterSel ? '#f5f5f0' : '#0a0a0a',
+                padding: clickable ? '2px 4px' : 0,
+                marginLeft: clickable ? -4 : 0,
+                marginRight: clickable ? -4 : 0,
+              }}
+            >
+              <ColorSwatch fg={le.fg} density={le.density} size={18} />
+              <span>{le.label}</span>
+              {isClusterSel && <span style={{ marginLeft: 'auto', fontWeight: 700 }}>◀</span>}
+            </div>
+          )
+        })}
         {colorMode === 'cluster' && clusterInfoRef.current.length > 12 && (
-          <div style={{ marginTop: 3, color: '#555550' }}>+{clusterInfoRef.current.length - 12} more</div>
+          <div style={{ marginTop: 4, color: '#555550', fontSize: 9 }}>+{clusterInfoRef.current.length - 12} more</div>
         )}
       </div>
+
+      {focusCluster != null && (() => {
+        const ci = clusterInfoRef.current.find(x => x.index === focusCluster)
+        if (!ci) return null
+        return createPortal(
+          <div style={{ position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 60, background: 'rgba(245,245,240,0.96)', border: '2px solid #0a0a0a', boxShadow: '3px 3px 0 #0a0a0a', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 10, letterSpacing: '0.1em', maxWidth: 'calc(100% - 24px)', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <span style={{ fontWeight: 700 }}>CLUSTER {ci.index + 1}</span>
+            <span style={{ height: 14, width: 1, background: '#0a0a0a' }} />
+            <span style={{ fontWeight: 700 }}>{ci.repr}</span>
+            <span style={{ color: '#555550' }}>{ci.count} ENTITIES · ISOLATED</span>
+            <button onClick={() => setFocusCluster(null)} style={{ padding: '3px 8px', border: '1px solid #0a0a0a', background: '#0a0a0a', color: '#f5f5f0', fontSize: 8, letterSpacing: '0.1em', fontFamily: 'Space Mono, monospace', fontWeight: 700, cursor: 'pointer' }}>SHOW ALL</button>
+          </div>,
+          document.body
+        )
+      })()}
 
       {!everClicked && !hovered && (
         <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 6, fontSize: 8, letterSpacing: '0.12em', color: '#555550', pointerEvents: 'none', background: 'rgba(245,245,240,0.8)', padding: '4px 8px', border: '1px solid #d4d4cc' }}>
@@ -739,7 +792,7 @@ export function Graph() {
         </div>
       )}
 
-      {selected && (
+      {selected && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'all' }}
           onClick={() => { setSelected(null); setNodeDetail(null) }}>
           <div style={{ width: '100%', maxWidth: 400, height: '100%', background: '#f5f5f0', borderLeft: '2px solid #0a0a0a', boxShadow: '-5px 0 0 #0a0a0a', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}
@@ -790,7 +843,7 @@ export function Graph() {
                       <span style={{ fontWeight: 700, color: '#0a0a0a' }}>{other}</span>
                       <span style={{ fontSize: 8, color: '#777', margin: '0 6px' }}>{otherLbl}</span>
                       <span style={{ fontSize: 8, letterSpacing: '0.08em', background: '#0a0a0a', color: '#f5f5f0', padding: '1px 5px' }}>{rel.predicate}</span>
-                      <span style={{ fontSize: 8, color: '#777', marginLeft: 6 }}>{isSubj ? '→' : '←'}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#0a0a0a', marginLeft: 6 }}>{isSubj ? '→' : '←'}</span>
                     </div>
                   )
                 })
@@ -817,14 +870,14 @@ export function Graph() {
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
 }
 
-function ColorSwatch({ fg, density }: { fg: Rgb; density: number }) {
-  const size = 12
+function ColorSwatch({ fg, density, size = 18 }: { fg: Rgb; density: number; size?: number }) {
   const bg: Rgb = [245, 245, 240]
   const pixels: { x: number; y: number; on: boolean }[] = []
   for (let py = 0; py < size; py++) for (let px = 0; px < size; px++) pixels.push({ x: px, y: py, on: BAYER[py % 4][px % 4] < density * 16 })
