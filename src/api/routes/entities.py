@@ -1,11 +1,13 @@
 """Entities route — search and browse extracted named entities + canonical nodes."""
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from src.api.deps import get_db
+from src.db.models.article import Article
 from src.db.models.entity import Entity
+from src.db.models.entity_edge import EntityEdge
 from src.db.models.entity_node import EntityNode
 from src.db.models.source import Source
 
@@ -203,6 +205,134 @@ def node_articles(
                 "language": r.language,
                 "source_name": r.source_name,
                 "published_date": r.published_date.isoformat() if r.published_date else None,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/entities/nodes/{node_id}/dossier")
+def entity_dossier(
+    node_id: int = Path(..., description="EntityNode id"),
+    limit: int = Query(default=25, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Journalist dossier for a canonical entity: mentions, sentiment/language mix,
+    top co-mentioned entities, and the most recent articles about it."""
+    node = db.get(EntityNode, node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="entity node not found")
+
+    # Sentiment / language / date distribution over non-failed, non-duplicate articles.
+    dist = db.execute(
+        select(
+            func.count(Article.id).label("c"),
+            func.min(Article.discovered_at).label("first_seen"),
+            func.max(Article.discovered_at).label("last_seen"),
+        )
+        .join(Entity, Entity.article_id == Article.id)
+        .where(Entity.node_id == node_id, Article.status.notin_(["failed", "duplicate"]))
+    ).first()
+
+    # Recent articles mentioning this entity.
+    rows = db.execute(
+        select(
+            Article.id,
+            Article.title,
+            Article.url,
+            Article.sentiment_label,
+            Article.language,
+            Article.published_date,
+            Article.discovered_at,
+            Source.name.label("source_name"),
+        )
+        .join(Entity, Entity.article_id == Article.id)
+        .join(Source, Source.id == Article.source_id)
+        .where(Entity.node_id == node_id, Article.status.notin_(["failed", "duplicate"]))
+        .order_by(desc(Article.discovered_at))
+        .limit(limit)
+    ).all()
+
+    # Top co-mentioned entities (co-occurrence edges touching this node).
+    edges = db.execute(
+        select(EntityEdge)
+        .where(or_(EntityEdge.node_a_id == node_id, EntityEdge.node_b_id == node_id))
+        .order_by(desc(EntityEdge.weight))
+        .limit(15)
+    ).scalars().all()
+    other_ids = [
+        e.node_b_id if e.node_a_id == node_id else e.node_a_id for e in edges
+    ]
+    related_nodes = (
+        db.execute(select(EntityNode).where(EntityNode.id.in_(other_ids))).scalars().all()
+        if other_ids
+        else []
+    )
+    related_map = {n.id: n for n in related_nodes}
+    related = [
+        {
+            "node_id": oid,
+            "text": related_map[oid].canonical_text,
+            "label": related_map[oid].label,
+            "weight": next(
+                e.weight for e in edges
+                if (e.node_a_id == node_id and e.node_b_id == oid)
+                or (e.node_b_id == node_id and e.node_a_id == oid)
+            ),
+        }
+        for oid in other_ids
+        if oid in related_map
+    ]
+
+    agg = db.execute(
+        select(
+            Article.sentiment_label,
+            Article.language,
+            func.count(Article.id).label("c"),
+        )
+        .join(Entity, Entity.article_id == Article.id)
+        .where(Entity.node_id == node_id, Article.status.notin_(["failed", "duplicate"]))
+        .group_by(Article.sentiment_label, Article.language)
+    ).all()
+    sent: dict[str, int] = {}
+    langs: dict[str, int] = {}
+    for r in agg:
+        if r.sentiment_label:
+            sent[r.sentiment_label] = sent.get(r.sentiment_label, 0) + r.c
+        if r.language:
+            langs[r.language] = langs.get(r.language, 0) + r.c
+
+    return {
+        "node_id": node.id,
+        "entity": {
+            "text": node.canonical_text,
+            "label": node.label,
+            "mention_count": node.mention_count,
+            "aliases": node.aliases or [],
+            "wikidata_id": node.wikidata_id,
+            "description": node.description,
+            "wikidata_url": (
+                f"https://www.wikidata.org/wiki/{node.wikidata_id}"
+                if node.wikidata_id
+                else None
+            ),
+        },
+        "mentions": dist.c if dist else 0,
+        "first_seen": dist.first_seen.isoformat() if dist and dist.first_seen else None,
+        "last_seen": dist.last_seen.isoformat() if dist and dist.last_seen else None,
+        "sentiment_distribution": sent,
+        "language_distribution": langs,
+        "related_entities": related,
+        "recent_articles": [
+            {
+                "id": r.id,
+                "title": r.title,
+                "url": r.url,
+                "sentiment_label": r.sentiment_label,
+                "language": r.language,
+                "source_name": r.source_name,
+                "published_date": r.published_date.isoformat() if r.published_date else None,
+                "discovered_at": r.discovered_at.isoformat() if r.discovered_at else None,
             }
             for r in rows
         ],

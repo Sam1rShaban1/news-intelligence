@@ -182,3 +182,86 @@ def get_story(
             for r in rows
         ],
     }
+
+
+@router.get("/stories/{story_id}/timeline")
+def story_timeline(
+    story_id: int = Path(..., description="Story id"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Chronological view of a story: members ordered by publication date, plus a
+    per-day rollup of volume and sentiment for quick trend spotting."""
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="Story not found")
+
+    members = db.execute(
+        select(
+            Article.id,
+            Article.title,
+            Article.url,
+            Article.language,
+            Article.sentiment_label,
+            Article.sentiment_score,
+            Article.summary,
+            Article.published_date,
+            Article.discovered_at,
+            Source.name.label("source"),
+        )
+        .join(story_articles, story_articles.c.article_id == Article.id)
+        .join(Source, Article.source_id == Source.id)
+        .where(story_articles.c.story_id == story_id)
+        .order_by(Article.published_date.asc().nullslast(), Article.discovered_at.asc())
+    ).all()
+
+    day_expr = func.date(func.coalesce(Article.published_date, Article.discovered_at))
+    rollup = db.execute(
+        select(
+            day_expr.label("day"),
+            func.count(Article.id).label("count"),
+            func.avg(Article.sentiment_score).label("avg_score"),
+            func.count(Article.id).filter(Article.sentiment_label == "pos").label("pos"),
+            func.count(Article.id).filter(Article.sentiment_label == "neg").label("neg"),
+            func.count(Article.id).filter(Article.sentiment_label == "neutral").label("neutral"),
+        )
+        .join(story_articles, story_articles.c.article_id == Article.id)
+        .where(story_articles.c.story_id == story_id)
+        .group_by(day_expr)
+        .order_by(day_expr)
+    ).all()
+
+    return {
+        "id": story.id,
+        "title": story.title,
+        "member_count": story.member_count,
+        "first_seen": story.first_seen.isoformat() if story.first_seen else None,
+        "last_seen": story.last_seen.isoformat() if story.last_seen else None,
+        "articles": [
+            {
+                "id": r.id,
+                "title": r.title,
+                "url": r.url,
+                "language": r.language,
+                "sentiment_label": r.sentiment_label,
+                "sentiment_score": r.sentiment_score,
+                "summary": r.summary,
+                "source": r.source,
+                "published_date": r.published_date.isoformat() if r.published_date else None,
+                "discovered_at": r.discovered_at.isoformat() if r.discovered_at else None,
+            }
+            for r in members
+        ],
+        "timeline": [
+            {
+                "date": r.day.isoformat() if r.day else None,
+                "count": r.count,
+                "avg_sentiment_score": (
+                    round(float(r.avg_score), 4) if r.avg_score is not None else None
+                ),
+                "pos": r.pos,
+                "neg": r.neg,
+                "neutral": r.neutral,
+            }
+            for r in rollup
+        ],
+    }

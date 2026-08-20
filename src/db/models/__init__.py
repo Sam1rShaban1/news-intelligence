@@ -8,6 +8,8 @@ from .entity_node import EntityNode
 from .relationship import Relationship
 from .source import Source
 from .story import Story, story_articles
+from .watchlist import WatchlistItem
+from .alert import Alert, AlertRule
 
 __all__ = [
     "Base",
@@ -20,4 +22,7 @@ __all__ = [
     "Relationship",
     "Story",
     "story_articles",
+    "WatchlistItem",
+    "Alert",
+    "AlertRule",
 ]
