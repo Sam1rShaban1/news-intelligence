@@ -2,18 +2,28 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from config.settings import settings
 from src.api.deps import get_db
 from src.api.search_query import apply_filters
 from src.db.models.article import Article
 from src.db.models.entity import Entity
 from src.db.models.entity_node import EntityNode
 from src.db.models.source import Source
+from src.nlp.embeddings import cosine, get_embedder
+from src.nlp.normalize import normalize_text
 
 router = APIRouter(tags=["search"])
+
+
+class SemanticQuery(BaseModel):
+    text: str
+    limit: int = 20
+    language: str | None = None
 
 
 @router.get("/search")
@@ -71,11 +81,14 @@ def search_articles(
     ).join(Source, Source.id == Article.source_id)
 
     if q:
-        sel = sel.add_columns(
-            func.ts_rank_cd(
-                Article.search_vector, func.websearch_to_tsquery("simple", q)
-            ).label("rank")
-        )
+        norm_q = normalize_text(q)
+        if norm_q:
+            rank_expr = func.ts_rank(
+                Article.search_vector, func.websearch_to_tsquery("simple", norm_q)
+            )
+        else:
+            rank_expr = func.literal(0.0)
+        sel = sel.add_columns(rank_expr.label("rank"))
 
     sel = apply_filters(
         sel, q, language, sentiment, source_id, entity, predicate, date_from, date_to
@@ -131,5 +144,61 @@ def search_articles(
                 "entities": ent_map.get(r.id, [])[:5],
             }
             for r in rows
+        ],
+    }
+
+
+@router.post("/search/semantic", response_model=None)
+def semantic_search(body: SemanticQuery, db: Session = Depends(get_db)) -> dict:
+    """Nearest-neighbour search over precomputed article embeddings (VPS tier).
+
+    Returns analyzed articles most similar to `text` by cosine similarity. Requires
+    embeddings to have been computed by the embeddings worker (FEATURE_EMBEDDINGS).
+    """
+    if not settings.feature_embeddings:
+        raise HTTPException(
+            status_code=503, detail="Semantic search is disabled (FEATURE_EMBEDDINGS=false)"
+        )
+    q = (body.text or "").strip()
+    if len(q) < 2:
+        raise HTTPException(status_code=400, detail="Query too short")
+
+    embedder = get_embedder()
+    qvec = embedder.embed([q])[0]
+
+    rows = db.execute(
+        select(Article).where(
+            Article.status == "analyzed", Article.embedding.isnot(None)
+        )
+    ).scalars().all()
+
+    scored = []
+    for a in rows:
+        if body.language and a.language != body.language:
+            continue
+        sim = cosine(qvec, a.embedding)
+        if sim <= 0:
+            continue
+        scored.append((sim, a))
+    scored.sort(key=lambda x: -x[0])
+    top = scored[: body.limit]
+
+    return {
+        "query": q,
+        "count": len(top),
+        "results": [
+            {
+                "id": a.id,
+                "title": a.title,
+                "url": a.url,
+                "source_id": a.source_id,
+                "source_name": a.source_name if hasattr(a, "source_name") else None,
+                "language": a.language,
+                "sentiment_label": a.sentiment_label,
+                "published_date": a.published_date.isoformat() if a.published_date else None,
+                "summary": a.summary,
+                "score": round(sim, 4),
+            }
+            for sim, a in top
         ],
     }

@@ -11,6 +11,7 @@ export function Explore({ initialQuery }: { initialQuery: string }) {
   const [lang, setLang] = useState<string[]>([])
   const [sentiment, setSentiment] = useState('')
   const [sort, setSort] = useState('rank')
+  const [mode, setMode] = useState<'keyword' | 'semantic'>('keyword')
   const [page, setPage] = useState(0)
   const [results, setResults] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -26,6 +27,29 @@ export function Explore({ initialQuery }: { initialQuery: string }) {
     const ac = acRef.current
     setLoading(true)
     setError(false)
+
+    if (mode === 'semantic') {
+      const text = q || ''
+      if (text.trim().length < 2) {
+        setResults({ total: 0, results: [] })
+        setLoading(false)
+        return
+      }
+      api.semanticSearch({
+        text,
+        limit,
+        language: lang.length === 1 ? lang[0] : undefined,
+      })
+        .then(r => {
+          if (!ac.signal.aborted) {
+            setResults({ total: r.count, results: r.results, semantic: true })
+            setLoading(false)
+          }
+        })
+        .catch(() => { if (!ac.signal.aborted) { setResults(null); setError(true); setLoading(false) } })
+      return
+    }
+
     const opts = {
       q: q || undefined,
       language: lang.length ? lang.join(',') : undefined,
@@ -39,13 +63,13 @@ export function Explore({ initialQuery }: { initialQuery: string }) {
       .then(r => { if (!ac.signal.aborted) { setResults(r); setLoading(false) } })
       .catch(() => { if (!ac.signal.aborted) { setResults(null); setError(true); setLoading(false) } })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, lang, sentiment, sort, page, limit])
+  }, [q, lang, sentiment, sort, mode, page, limit])
 
   useEffect(() => {
     clearTimeout(timer.current)
     timer.current = setTimeout(() => { setPage(0); doSearch({ offset: 0 }) }, 350)
     return () => clearTimeout(timer.current)
-  }, [q, lang, sentiment, sort])
+  }, [q, lang, sentiment, sort, mode])
 
   useEffect(() => { doSearch() }, [page])
 
@@ -89,6 +113,14 @@ export function Explore({ initialQuery }: { initialQuery: string }) {
                 </button>
               ))}
             </div>
+            <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
+              {([['keyword', 'KEYWORD'], ['semantic', 'SEMANTIC']] as const).map(([m, l]) => (
+                <button key={m} onClick={() => setMode(m)}
+                  style={{ padding: '3px 8px', border: '1px solid #0a0a0a', background: mode === m ? '#0a0a0a' : 'transparent', color: mode === m ? '#f5f5f0' : '#0a0a0a', fontSize: 9, letterSpacing: '0.08em', fontFamily: 'Space Mono, monospace', cursor: 'pointer', fontWeight: 700 }}>
+                  {l}
+                </button>
+              ))}
+            </div>
           </div>
         </Card>
 
@@ -120,6 +152,15 @@ export function Explore({ initialQuery }: { initialQuery: string }) {
                     )}
                     {r.rank != null && (
                       <span style={{ marginLeft: 'auto', fontSize: 8, color: '#555550' }}>RANK {(r.rank * 100).toFixed(0)}</span>
+                    )}
+                    {r.score != null && (
+                      <span style={{ marginLeft: 'auto', fontSize: 8, color: '#555550' }}>SIM {r.score.toFixed(2)}</span>
+                    )}
+                    {r.id != null && (
+                      <a href={api.articlePdfUrl(String(r.id))} target="_blank" rel="noreferrer"
+                        style={{ fontSize: 8, padding: '2px 6px', border: '1px solid #0a0a0a', background: '#f5f5f0', letterSpacing: '0.1em', color: '#0a0a0a', textDecoration: 'none', cursor: 'pointer', fontWeight: 700 }}>
+                        PDF
+                      </a>
                     )}
                   </div>
                 </div>

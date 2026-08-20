@@ -34,8 +34,9 @@ def apply_filters(
     """Apply the shared set of search filters to any select rooted on `Article`."""
     if q:
         norm_q = normalize_text(q)
-        ts = func.websearch_to_tsquery("simple", norm_q)
-        stmt = stmt.where(Article.search_vector.op("@@")(ts))
+        if norm_q:
+            ts = func.websearch_to_tsquery("simple", norm_q)
+            stmt = stmt.where(Article.search_vector.op("@@")(ts))
 
     langs = parse_list(language)
     if langs:
@@ -64,6 +65,8 @@ def apply_filters(
     if date_to is not None:
         stmt = stmt.where(Article.discovered_at <= date_to)
 
+    # Never surface failed / duplicate (near-duplicate) articles.
+    stmt = stmt.where(Article.status.notin_(["failed", "duplicate"]))
     return stmt
 
 
