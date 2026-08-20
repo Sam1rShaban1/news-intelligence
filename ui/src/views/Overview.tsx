@@ -197,18 +197,18 @@ export function Overview({ search: _search, onNav }: { search: string; onNav?: (
         <Section title="ALERTS" sub="UNREAD / RECENT" onAction={onNav ? { label: 'OPEN', onClick: () => onNav('alerts') } : undefined}>
           <Card style={{ padding: 0 }}>
             {alerts === null ? <SkelArticleRows count={4} /> :
-             (alerts.unread ?? 0) > 0 || (alerts.items?.length ?? 0) > 0 ? (
+             (alerts.alerts?.length ?? 0) > 0 ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderBottom: '1px solid #d4d4cc' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700 }}>{alerts.unread ?? 0} UNREAD</span>
-                  <span style={{ fontSize: 8, color: '#555550', marginLeft: 'auto' }}>{alerts.total ?? 0} TOTAL</span>
+                  <span style={{ fontSize: 11, fontWeight: 700 }}>{alerts.alerts.filter((a: any) => !a.read).length} UNREAD</span>
+                  <span style={{ fontSize: 8, color: '#555550', marginLeft: 'auto' }}>{alerts.alerts.length} TOTAL</span>
                 </div>
-                {(alerts.items ?? []).slice(0, 5).map((a: any, i: number) => (
+                {alerts.alerts.slice(0, 5).map((a: any, i: number) => (
                   <button key={a.id} onClick={() => onNav?.('alerts')}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', border: 'none', borderBottom: i < Math.min(alerts.items.length, 5) - 1 ? '1px solid #d4d4cc' : 'none', background: a.read ? 'none' : '#e8e8e0', cursor: 'pointer', textAlign: 'left' }}>
-                    <span style={{ fontSize: 8, padding: '1px 4px', border: '1px solid #0a0a0a', letterSpacing: '0.1em', color: '#555550' }}>{(a.channel ?? 'email').toUpperCase()}</span>
-                    <span style={{ flex: 1, fontSize: 11, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.subject}</span>
-                    {a.fired_at && <span style={{ fontSize: 8, color: '#555550' }}>{a.fired_at.slice(0, 10)}</span>}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', border: 'none', borderBottom: i < Math.min(alerts.alerts.length, 5) - 1 ? '1px solid #d4d4cc' : 'none', background: a.read ? 'none' : '#e8e8e0', cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ flex: 1, fontSize: 11, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.article?.title ?? '(untitled)'}</span>
+                    <span style={{ fontSize: 8, color: '#555550' }}>{a.rule?.name}</span>
+                    {a.created_at && <span style={{ fontSize: 8, color: '#555550', width: 48, textAlign: 'right' }}>{a.created_at.slice(0, 10)}</span>}
                   </button>
                 ))}
               </>

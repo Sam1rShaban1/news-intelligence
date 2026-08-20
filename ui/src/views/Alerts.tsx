@@ -27,7 +27,7 @@ export function Alerts() {
       api.alerts({ limit: 50 }).catch(() => null),
     ])
       .then(([rs, al]) => {
-        setRules(rs as any[])
+        setRules((rs as any)?.rules ?? [])
         setAlerts(al)
         setLoading(false)
       })
