@@ -24,7 +24,7 @@ def claim_articles(session, batch_size: int, zombie_timeout_minutes: int) -> lis
     query = (
         select(Article)
         .where(
-            Article.status == "extracted",
+            Article.status.in_(["extracted", "analyzing"]),
             Article.started_at.is_(None) | (Article.started_at < cutoff),
             Article.retry_count < 3,
         )

@@ -66,8 +66,14 @@ def _reason(rule: AlertRule) -> str:
     return "; ".join(parts) or "rule match"
 
 
-def run_alerts_cycle(config: WorkerConfig) -> int:
-    """One alert scan pass over all enabled rules. Returns alerts created."""
+def run_alerts_cycle(config: WorkerConfig, page_size: int = 500) -> int:
+    """One alert scan pass over all enabled rules. Returns alerts created.
+
+    Candidate articles are processed in `analyzed_at`-ordered pages so that a rule
+    matching more than `page_size` articles in a single poll does not silently drop
+    the remainder: `last_checked_at` is advanced only to "now" once every match in
+    the window has been considered.
+    """
     created = 0
     with SessionLocal() as db:
         rules = db.execute(
@@ -78,29 +84,38 @@ def run_alerts_cycle(config: WorkerConfig) -> int:
 
         now = datetime.now(timezone.utc)
         for rule in rules:
-            since = rule.last_checked_at
-            candidates = db.execute(
-                _match_subquery(rule, since).limit(500)
-            ).scalars().all()
-            if not candidates:
-                rule.last_checked_at = now
-                continue
-
-            ids = [a.id for a in candidates]
-            existing = set(
-                r[0] for r in db.execute(
-                    select(Alert.article_id).where(
-                        Alert.rule_id == rule.id, Alert.article_id.in_(ids)
-                    )
-                ).all()
-            )
+            cursor = rule.last_checked_at
             reason = _reason(rule)
-            for a in candidates:
-                if a.id in existing:
-                    continue
-                db.add(Alert(rule_id=rule.id, article_id=a.id, reason=reason))
-                created += 1
-                existing.add(a.id)
+            while True:
+                page = db.execute(
+                    _match_subquery(rule, cursor)
+                    .order_by(Article.analyzed_at)
+                    .limit(page_size)
+                ).scalars().all()
+                if not page:
+                    break
+
+                ids = [a.id for a in page]
+                existing = set(
+                    r[0] for r in db.execute(
+                        select(Alert.article_id).where(
+                            Alert.rule_id == rule.id, Alert.article_id.in_(ids)
+                        )
+                    ).all()
+                )
+                for a in page:
+                    if a.id in existing:
+                        continue
+                    db.add(Alert(rule_id=rule.id, article_id=a.id, reason=reason))
+                    created += 1
+                    existing.add(a.id)
+
+                # Articles without an analyzed_at can't be paginated further
+                # (NULL > cursor is never true); they were already processed above.
+                new_cursor = page[-1].analyzed_at
+                if new_cursor is None or new_cursor == cursor:
+                    break
+                cursor = new_cursor
             rule.last_checked_at = now
         db.commit()
     return created

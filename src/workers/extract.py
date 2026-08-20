@@ -36,11 +36,12 @@ def claim_articles(session, batch_size: int, zombie_timeout_minutes: int) -> lis
     """
     cutoff = text(f"now() - interval '{zombie_timeout_minutes} minutes'")
 
-    # Claim new articles or zombies
+    # Claim new articles or zombies (including our own in-progress state, so a
+    # worker killed mid-extract is reclaimed after the zombie timeout).
     query = (
         select(Article)
         .where(
-            Article.status.in_(["fetched", "new"]),
+            Article.status.in_(["fetched", "new", "extracting"]),
             (Article.started_at.is_(None)) | (Article.started_at < cutoff),
             Article.retry_count < 3,
         )
