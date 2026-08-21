@@ -1,13 +1,19 @@
 """Article content extractor — newspaper4k primary, BeautifulSoup fallback."""
 
 import logging
+import warnings
 from typing import Any
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
 from config.settings import settings
 from src.collector.ssrf import safe_fetch
+
+# The BS4 fallback parses article *HTML*. Some responses (XHTML / Atom-ish bodies)
+# make BeautifulSoup emit XMLParsedAsHTMLWarning; we keep the HTML parser (switching
+# to the XML parser would break ordinary HTML extraction), so silence just this warning.
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 logger = logging.getLogger(__name__)
 
