@@ -26,7 +26,7 @@ jobs:
       NEWS_DATABASE_URL: postgresql://news:news@localhost:5432/news_intelligence
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install (from pinned lockfiles)
