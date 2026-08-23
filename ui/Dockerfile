@@ -10,6 +10,9 @@ RUN pnpm build
 # ---- Runtime stage ----
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Template is rendered by the nginx image's entrypoint (envsubst), which only
+# substitutes *environment* variables, so nginx vars like $upstream/$host are
+# left intact. API_KEY is injected here from the frontend service env.
+COPY templates /etc/nginx/templates
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

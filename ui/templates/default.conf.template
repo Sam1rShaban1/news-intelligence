@@ -1,0 +1,45 @@
+limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Proxy API calls to the FastAPI backend service (same compose network).
+    # `web` is resolved at request time via Docker's embedded DNS (127.0.0.11),
+    # so nginx starts even if `web` is not yet up. The variable upstream must be
+    # set BEFORE the rewrite so it is not skipped by `break`.
+    location /api/ {
+        resolver 127.0.0.11 valid=10s ipv6=off;
+        set $upstream http://web:8000;
+        rewrite ^/api/(.*)$ /$1 break;
+        # Throttle /api to protect heavy endpoints (semantic search, exports).
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass $upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Inject the API key at the proxy so the browser never holds it.
+        # API_KEY is environment-substituted by the nginx image's entrypoint
+        # (empty = auth disabled, which preserves current behaviour).
+        proxy_set_header X-API-Key ${API_KEY};
+    }
+
+    # Hashed static assets: cache forever and NEVER fall back to index.html.
+    # A missing asset must 404, not return text/html (which would break workers
+    # and other module scripts via a disallowed MIME type).
+    location /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # SPA fallback — but never cache index.html so new deploys are picked up
+    # immediately instead of serving a stale bundle that references old assets.
+    location / {
+        add_header Cache-Control "no-cache";
+        try_files $uri $uri/ /index.html;
+    }
+}
