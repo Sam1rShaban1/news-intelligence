@@ -16,8 +16,6 @@ Please **do not** open a public GitHub issue for security vulnerabilities.
 
 - Use **GitHub Private Vulnerability Reporting**: open the
   *Security* tab on the repository and choose *Report a vulnerability*.
-- If that is unavailable, email the maintainers at **security@news-intelligence.example**
-  (replace `example` with the real TLD) and encrypt if possible.
 
 Include as much detail as you can:
 
