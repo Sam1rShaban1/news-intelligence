@@ -3,12 +3,12 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: news
-      POSTGRES_PASSWORD: news
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-news}
       POSTGRES_DB: news_intelligence
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     mem_limit: 1g
     restart: unless-stopped
     healthcheck:
@@ -29,7 +29,7 @@ services:
       seed:
         condition: service_completed_successfully
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
       NEWS_SENTIMENT_MODEL: transformer
       NEWS_LOG_LEVEL: INFO
     volumes:
@@ -37,7 +37,7 @@ services:
     mem_limit: 1g
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:news@postgres:5432/news_intelligence')\""]
+      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence')\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -54,19 +54,20 @@ services:
       seed:
         condition: service_completed_successfully
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
       NEWS_LOG_LEVEL: INFO
+      HF_HOME: /home/app/.cache/huggingface
       OMP_NUM_THREADS: "2"
       ORT_NUM_THREADS: "2"
       NEWS_NER_POLL_INTERVAL: "2"
       NEWS_NER_BATCH_SIZE: "50"
     volumes:
       - ./config:/app/config:ro
-      - hf_cache:/root/.cache/huggingface
+      - hf_cache:/home/app/.cache/huggingface
     mem_limit: 2g
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:news@postgres:5432/news_intelligence')\""]
+      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence')\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -79,7 +80,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
     restart: "no"
 
   seed:
@@ -90,7 +91,7 @@ services:
       migrate:
         condition: service_completed_successfully
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
       PYTHONPATH: /app
     volumes:
       - ./config:/app/config:ro
@@ -108,14 +109,14 @@ services:
       seed:
         condition: service_completed_successfully
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
       NEWS_LOG_LEVEL: INFO
     volumes:
       - ./config:/app/config:ro
     mem_limit: 512m
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:news@postgres:5432/news_intelligence')\""]
+      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence')\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -132,14 +133,14 @@ services:
       seed:
         condition: service_completed_successfully
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
       NEWS_LOG_LEVEL: INFO
     volumes:
       - ./config:/app/config:ro
-    mem_limit: 2g
+    mem_limit: 1g
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:news@postgres:5432/news_intelligence')\""]
+      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence')\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -152,10 +153,11 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
+      NEWS_API_KEY: ${NEWS_API_KEY:-}
       NEWS_LOG_LEVEL: INFO
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     mem_limit: 512m
     restart: unless-stopped
     healthcheck:
@@ -170,6 +172,10 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - web
+    environment:
+      # Injected by nginx into proxied /api requests so the browser never needs
+      # the key. Set NEWS_API_KEY in your .env; empty = auth disabled.
+      API_KEY: ${NEWS_API_KEY:-}
     ports:
       - "8501:80"
     mem_limit: 128m

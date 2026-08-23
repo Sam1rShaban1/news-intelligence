@@ -17,12 +17,12 @@ services:
     image: postgres:16
     environment:
       POSTGRES_USER: news
-      POSTGRES_PASSWORD: news
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-news}
       POSTGRES_DB: news_intelligence
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     mem_limit: 1g
     restart: unless-stopped
     healthcheck:
@@ -43,7 +43,8 @@ services:
       seed:
         condition: service_completed_successfully
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
+      NEWS_API_KEY: ${NEWS_API_KEY:-}
       # Lightweight sentiment only (VADER + mk/sq/tr lexicon).
       NEWS_SENTIMENT_MODEL: auto
       NEWS_FEATURE_NER: "false"
@@ -54,7 +55,7 @@ services:
     mem_limit: 1g
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:news@postgres:5432/news_intelligence')\""]
+      test: ["CMD-SHELL", "python -c \"import psycopg2; psycopg2.connect('postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence')\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -67,7 +68,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
     restart: "no"
 
   seed:
@@ -78,7 +79,7 @@ services:
       migrate:
         condition: service_completed_successfully
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
       PYTHONPATH: /app
     volumes:
       - ./config:/app/config:ro
@@ -92,12 +93,12 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      NEWS_DATABASE_URL: postgresql://news:news@postgres:5432/news_intelligence
+      NEWS_DATABASE_URL: postgresql://news:${POSTGRES_PASSWORD:-news}@postgres:5432/news_intelligence
       NEWS_FEATURE_NER: "false"
       NEWS_FEATURE_EMBEDDINGS: "false"
       NEWS_LOG_LEVEL: INFO
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     mem_limit: 512m
     restart: unless-stopped
     healthcheck:
@@ -112,6 +113,8 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - web
+    environment:
+      API_KEY: ${NEWS_API_KEY:-}
     ports:
       - "8501:80"
     mem_limit: 128m
