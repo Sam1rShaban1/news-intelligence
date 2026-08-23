@@ -1,0 +1,6 @@
+-r base.in
+gliner2-onnx>=0.1
+onnxruntime>=1.18
+tokenizers>=0.19
+pgvector>=0.3
+reportlab>=4.0
