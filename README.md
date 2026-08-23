@@ -283,16 +283,20 @@ built and run automatically by `docker compose up`.
 
 ## Screenshots
 
-> Capture them with the stack running locally (`docker compose up`) and drop the PNGs into
-> `docs/screenshots/`, then update the paths below. They are referenced from this section.
+Captured from a local deployment (`docker compose up`); the PNGs live in
+[`docs/screenshots/`](docs/screenshots/).
 
-| View      | File |
-| --------- | ---- |
-| Overview  | `docs/screenshots/overview.png` |
-| Explore   | `docs/screenshots/explore.png` |
-| Entities  | `docs/screenshots/entities.png` |
-| Graph     | `docs/screenshots/graph.png` |
-| Stories   | `docs/screenshots/stories.png` |
+| Overview | Explore | Sentiment |
+| -------- | ------- | --------- |
+| ![Overview](docs/screenshots/overview.png) | ![Explore](docs/screenshots/explore.png) | ![Sentiment](docs/screenshots/sentiment.png) |
+
+| Entities | Graph | Stories |
+| -------- | ----- | ------- |
+| ![Entities](docs/screenshots/entities.png) | ![Graph](docs/screenshots/graph.png) | ![Stories](docs/screenshots/stories.png) |
+
+| Sources | Watchlist | Alerts |
+| ------- | --------- | ------ |
+| ![Sources](docs/screenshots/sources.png) | ![Watchlist](docs/screenshots/watchlist.png) | ![Alerts](docs/screenshots/alerts.png) |
 
 ---
 
