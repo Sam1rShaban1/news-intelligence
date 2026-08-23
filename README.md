@@ -1,5 +1,10 @@
 # News Intelligence — North Macedonia
 
+[![CI](https://github.com/Sam1rShaban1/news-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/Sam1rShaban1/news-intelligence/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org)
+[![Deployment](https://img.shields.io/badge/deployment-docker--compose-0db7ed.svg)](docker-compose.yml)
+
 A self-hosted, multilingual news intelligence platform for **North Macedonia** that
 ingests Macedonian, Albanian, English and Turkish news feeds 24/7, enriches every
 article with sentiment and multilingual Named-Entity Recognition (NER), and builds a
@@ -546,6 +551,8 @@ docker compose exec postgres psql -U news -d news_intelligence \
   the transformer model is more balanced but still a general-purpose sentiment model.
 - **`stories`** are clustered heuristically by shared entities, not by full semantic
   similarity.
+- **Alerts are in-app only** in this release — alert rules are evaluated and shown on
+  the Alerts page, but there is no email / Slack / push delivery yet.
 
 ---
 
