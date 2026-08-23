@@ -29,30 +29,31 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install
-        # The app runs as `python -m src.workers` (PYTHONPATH=/app), not as an
-        # installed package, so we install runtime + dev deps directly.
+      - name: Install (from pinned lockfiles)
         run: |
           python -m pip install --upgrade pip
-          pip install pytest ruff
-          pip install \
-            "sqlalchemy[asyncio]>=2.0" \
-            "psycopg2-binary>=2.9" \
-            "alembic>=1.13" \
-            "httpx>=0.27" \
-            "feedparser>=6.0" \
-            "newspaper4k[lxml]>=0.9" \
-            "apscheduler==3.10.4" \
-            "fastapi>=0.115" \
-            "uvicorn[standard]>=0.30" \
-            "pydantic-settings>=2.0" \
-            "vaderSentiment>=3.3" \
-            "langid>=1.1.6" \
-            "beautifulsoup4>=4.12" \
-            "pyyaml>=6.0"
+          pip install -r requirements/base.lock
+          pip install pytest pytest-cov ruff mypy pip-audit
       - name: Lint (ruff)
         run: ruff check src/ config/ tests/ scripts/
+      - name: Type check (mypy, advisory)
+        # Advisory for now: surfaces type issues without blocking the pipeline.
+        continue-on-error: true
+        run: mypy src/
       - name: Alembic migrate
         run: python -m alembic upgrade head
       - name: Tests
-        run: pytest -q
+        run: pytest -q --cov=src --cov-report=term-missing
+      - name: Dependency audit (pip-audit, advisory)
+        # Advisory: reports known CVEs in pinned deps without failing the build.
+        continue-on-error: true
+        run: pip-audit -r requirements/base.lock -r requirements/vps.lock
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build vps tier (includes verified model bake)
+        run: docker compose build web
+      - name: Build pi tier
+        run: docker compose build --target pi
