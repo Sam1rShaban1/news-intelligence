@@ -322,6 +322,24 @@ template is provided in [`.env.example`](.env.example).
 > The Docker image **bakes** the sentiment ONNX + tokenizer into `/app/models` at build
 > time (see `Dockerfile`), so `NEWS_SENTIMENT_MODEL=transformer` works out of the box.
 
+### Security
+
+- **Ports are loopback-bound by default.** `docker-compose.yml` publishes Postgres
+  (`5432`) and the API (`8000`) on `127.0.0.1` only; only the `frontend` (`:8501`) is
+  reachable from the host network. On a VPS, keep it that way and put the stack behind a
+  reverse proxy / firewall — **never** expose `5432` or `8000` to the public internet,
+  and override `POSTGRES_PASSWORD` in your `.env` (the default `news`/`news` credentials
+  are well-known). See `SECURITY.md` for the threat model.
+- **Optional API key.** Set `NEWS_API_KEY` in `.env` to require an `X-API-Key` header on
+  every API route except `/health`. The nginx frontend injects the key into proxied
+  `/api` requests automatically, so the browser UI works without ever holding the secret.
+  Leave it empty to disable auth (trusted-network / single-tenant use).
+- **Non-root containers.** Every service image drops to an unprivileged `app` user, and
+  the baked sentiment model is verified against a pinned `sha256` at build time
+  (supply-chain hardening).
+- **SSRF guard.** User-supplied feed URLs are validated to block non-http(s) and
+  internal/loopback addresses — see *NLP / ML pipeline → Fetch*.
+
 ### Sources (`config/sources.yml`)
 
 List of feeds, grouped by language. Each entry:
