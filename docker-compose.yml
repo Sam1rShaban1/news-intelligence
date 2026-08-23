@@ -75,7 +75,10 @@ services:
   migrate:
     build:
       target: vps
-    command: ["-m", "alembic", "upgrade", "head"]
+    # Retry the DB connection briefly: on a cold start the embedded Docker DNS
+    # may not have registered `postgres` yet, which otherwise fails the run.
+    entrypoint: ["sh", "-c"]
+    command: "n=1; while [ $$n -le 30 ]; do python -c \"import psycopg2; psycopg2.connect('${NEWS_DATABASE_URL}')\" 2>/dev/null && break; n=$$((n+1)); sleep 2; done; alembic upgrade head"
     depends_on:
       postgres:
         condition: service_healthy
