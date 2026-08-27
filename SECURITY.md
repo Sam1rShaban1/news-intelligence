@@ -34,6 +34,16 @@ securing their own deployment (network exposure, credentials, the Postgres
 database, and the `NEWS_*` configuration). This policy covers vulnerabilities in
 the code in this repository, not misconfigurations of a self-hosted instance.
 
+**Deployment hardening checklist for operators:**
+- Change the default `POSTGRES_PASSWORD` (`news`) before exposing any service
+  beyond `127.0.0.1`/loopback. The API and Postgres are bound to loopback by
+  default in the compose files; only the `frontend` (port 8501) is the intended
+  public entry point.
+- Set `NEWS_API_KEY` (and keep it out of version control) so the API is not
+  unauthenticated. The nginx frontend injects it into proxied `/api` requests.
+- Do not place the `frontend` port on an untrusted network without `NEWS_API_KEY`
+  set.
+
 The application bundles third-party ML models (GLiNER2, XLM-RoBERTa sentiment,
 VADER) and libraries — see the `NOTICE` file for attribution. Vulnerabilities in
 those upstream components should be reported to their respective maintainers.

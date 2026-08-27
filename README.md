@@ -137,7 +137,9 @@ the full attribution.
 
 - **Backend:** ONNX Runtime (MIT), FastAPI / Uvicorn / Pydantic (MIT), SQLAlchemy +
   Alembic (MIT), `newspaper4k` (MIT), `feedparser` (BSD), APScheduler (MIT),
-  `pgvector` (Apache-2.0), `psycopg2` (LGPL-3.0).
+  `pgvector` (PostgreSQL License), `psycopg2` (LGPL-3.0 with linking exception),
+  `beautifulsoup4` (MIT), `lxml` (BSD-3-Clause), `nltk` (Apache-2.0),
+  `reportlab` (BSD-3-Clause), `tokenizers` (Apache-2.0), `langid` (BSD-3-Clause).
 - **Frontend:** React / React DOM / Vite / Tailwind CSS (MIT), `d3-force` / `d3-zoom`
   / `d3-selection` (BSD-3-Clause), `louvain` / js-louvain (MIT).
 
@@ -223,7 +225,10 @@ Cyrillic articles.
 
 ## REST API (`web`, port 8000)
 
-Base path `/`. Returns JSON. Key endpoints:
+Base path `/`. Returns JSON. An interactive **Swagger UI** is served at
+`/docs` and **Redoc** at `/redoc` (auto-generated from the FastAPI app).
+
+Key endpoints:
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -383,6 +388,11 @@ SQLAlchemy models under `src/db/models/`. Alembic migrations under `alembic/vers
 | 007 | fts_fix | drops the old `search_vector` PL/pgSQL trigger; FTS is now Python-owned (`to_tsvector('simple', normalize_text(...))`). |
 | 008 | entity_wikidata | `entity_nodes` external-id columns (`wikidata_id`, `wikipedia_url`, `description`, `merge_target_id`) for entity resolution. |
 | 009 | source_deleted | `sources.deleted` soft-delete flag + indexes on `enabled`/`deleted`. |
+| 010 | pipeline_statuses | in-progress pipeline statuses (`extracting` / `analyzing` / `ner_running`). |
+| 011 | duplicate_detection | `articles.duplicate_of_id` + `duplicate` status for near-duplicate URLs. |
+| 012 | watchlist | `watchlist` table for journalist-curated entity monitoring. |
+| 013 | alerts | `alert_rules` + `fired_alerts` tables. |
+| 014 | embeddings | `articles.embedding` (portable `ARRAY(FLOAT)`) for semantic nearest-neighbour search. |
 
 The `migrate` service runs `alembic upgrade head` automatically at startup (and
 `worker`/`ner` wait for it), so no manual migration step is needed.
@@ -390,6 +400,18 @@ The `migrate` service runs `alembic upgrade head` automatically at startup (and
 ---
 
 ## Build & deploy
+
+### Prerequisites
+
+- **Docker** ≥ 24.0 and **Docker Compose v2** (`docker compose`, not the legacy
+  `docker-compose` binary).
+- **RAM:** ≥ 6 GB free (the `vps` target loads ONNX models for sentiment + NER;
+  the `pi` target needs less but disables those features).
+- **Disk:** ~4 GB for images + model caches (GLiNER2 downloads at runtime into the
+  `hf_cache` volume, ~1.5–2 GB).
+- **Network:** outbound HTTPS to Hugging Face (for the GLiNER2 model) and to your
+  configured news RSS feeds. For an offline/air-gapped deploy, pre-populate the
+  `hf_cache` volume (see *Models & offline use* below).
 
 ### On a laptop / build machine
 
@@ -401,9 +423,15 @@ docker compose build            # source + Dockerfile changes are picked up auto
 ### Running locally (laptop)
 
 ```bash
+cp .env.example .env            # create your local env (edit NEWS_API_KEY + POSTGRES_PASSWORD)
 docker compose up -d
 # frontend: http://localhost:8501   API: http://localhost:8000
+# API docs (Swagger UI): http://localhost:8000/docs   (Redoc: http://localhost:8000/redoc)
 ```
+
+> **Set `NEWS_API_KEY`** in `.env` and keep the `frontend` port (8501) on a trusted
+> network only — by default the API and Postgres are bound to `127.0.0.1`, but the
+> frontend is the public entry point. Without `NEWS_API_KEY` the API is unauthenticated.
 
 ### Deploying to a Raspberry Pi 4B (8 GB)
 
@@ -578,18 +606,22 @@ docker compose exec postgres psql -U news -d news_intelligence \
 
 ```
 .
-├── Dockerfile                 # single image for all services
+├── Dockerfile                 # single image (vps + pi targets) for all services
 ├── docker-compose.yml         # postgres, migrate, seed, worker, ner, web, frontend
+├── docker-compose.pi.yml      # Raspberry Pi / low-RAM variant
 ├── config/
 │   ├── settings.py            # NEWS_* env configuration
 │   └── sources.yml            # RSS feed list (per language)
-├── alembic/                   # DB migrations (001–007)
+├── alembic/                   # DB migrations (001–014)
 ├── ui/                       # React + Vite + Tailwind frontend (SPA), served by nginx
 ├── src/
 │   ├── api/                   # FastAPI app + routes (articles, search, analytics,
-│   │                         #   entities, sentiment, graph, stories)
+│   │                         #   entities, sentiment, graph, stories, watchlist, alerts)
 │   ├── db/                    # SQLAlchemy models + session
 │   ├── nlp/                   # normalize, ner, graph, relations, stories, sentiment_onnx
 │   └── workers/               # fetch/extract/sentiment loop + ner_service + lifecycle
+├── tests/                    # pytest suite (requires a Postgres service)
+├── requirements/             # pinned lockfiles (base.lock, vps.lock) + .in sources
+├── .github/                  # CI, release, PR/issue templates
 └── scripts/                   # seed_sources.py, backfill_search_vector.py, merge_entities.py
 ```
