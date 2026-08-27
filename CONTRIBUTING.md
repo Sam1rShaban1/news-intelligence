@@ -12,11 +12,19 @@ local-first news analysis platform (Python backend + React frontend).
 
 ## Running the stack locally
 
-```bash
-# Bring up everything: postgres, migrate, seed, worker, ner, web, frontend
-docker compose up -d
+**Pre-built images (fastest):**
 
-# Frontend:  http://localhost:8501   API: http://localhost:8000
+```bash
+cp .env.example .env
+docker compose pull
+docker compose up -d
+```
+
+**Build from source** (when developing or before the first GHCR release):
+
+```bash
+docker compose build
+docker compose up -d
 ```
 
 The first `ner` start downloads the GLiNER2 ONNX model into the `hf_cache`

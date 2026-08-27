@@ -1,18 +1,65 @@
-# News Intelligence — North Macedonia
+# News Intelligence
 
 [![CI](https://github.com/Sam1rShaban1/news-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/Sam1rShaban1/news-intelligence/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org)
 [![Deployment](https://img.shields.io/badge/deployment-docker--compose-0db7ed.svg)](docker-compose.yml)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED.svg)](https://github.com/Sam1rShaban1/news-intelligence/pkgs/container/news-intelligence-worker)
 
-A self-hosted, multilingual news intelligence platform for **North Macedonia** that
-ingests Macedonian, Albanian, English and Turkish news feeds 24/7, enriches every
-article with sentiment and multilingual Named-Entity Recognition (NER), and builds a
-**searchable knowledge graph** of people, organisations, locations and the events that
-connect them.
+**Self-hosted, multilingual news intelligence platform** — ingest RSS/Atom feeds,
+analyse sentiment and named entities, and explore a searchable knowledge graph of
+people, organisations, locations, and the events that connect them.
 
-It is designed to run on modest hardware (a Raspberry Pi 4B, 8 GB, no GPU) and is fully
-containerised with Docker Compose.
+Ships with a **reference deployment for North Macedonia** (Macedonian, Albanian,
+English, Turkish) but works for any region: swap the feed list, extend normalisation
+rules, and run the same pipeline on modest hardware (including a Raspberry Pi 4B).
+
+---
+
+## Quick start
+
+Pre-built images are published to [GitHub Container Registry](https://github.com/Sam1rShaban1/news-intelligence/pkgs/container/news-intelligence-worker)
+on every release tag (`v*`). After the first tagged release, `docker compose pull` fetches
+them automatically; until then, use `docker compose build` (see *Build from source*).
+
+```bash
+git clone https://github.com/Sam1rShaban1/news-intelligence.git
+cd news-intelligence
+cp .env.example .env          # set POSTGRES_PASSWORD and optionally NEWS_API_KEY
+docker compose pull           # fetch ghcr.io/sam1rshaban1/* images (or build locally — see below)
+docker compose up -d
+```
+
+Open **http://localhost:8501** (frontend). API docs: **http://localhost:8000/docs**.
+
+Pin a release instead of `latest`:
+
+```bash
+NI_IMAGE_TAG=v0.1.0 docker compose pull && NI_IMAGE_TAG=v0.1.0 docker compose up -d
+```
+
+> **First run:** the `ner` service downloads the GLiNER2 ONNX model into the `hf_cache`
+> volume once (~1.5–2 GB). Sentiment ONNX is already baked into the image.
+
+---
+
+## Use it for your region
+
+The North Macedonia feed list in `config/sources.yml` is a **starter pack**, not a
+hard requirement. To deploy for another country or language mix:
+
+1. **Replace or extend feeds** — edit `config/sources.yml`, or add sources from the
+   **Sources** tab in the UI after first boot.
+2. **Extend normalisation** — `src/nlp/normalize.py` handles Macedonian Cyrillic → Latin
+   and Turkish/Albanian diacritic folding; add transliteration or folding rules for your
+   scripts as needed.
+3. **Tune sentiment fallback** — with `NEWS_SENTIMENT_MODEL=lexicon` or on the `pi` tier,
+   mk/sq/tr lexicons apply; other languages fall back to VADER until you add a lexicon or
+   use the multilingual transformer (`NEWS_SENTIMENT_MODEL=transformer`).
+4. **Entity linking** — for cross-language synonyms (e.g. city names in different
+   scripts), run optional Wikidata linking (`scripts/link_wikidata.py`) and merge by Q-id.
+
+See [ROADMAP.md](ROADMAP.md) for planned **region packs** and i18n work.
 
 ---
 
@@ -44,15 +91,15 @@ NER + baked ONNX sentiment + `pgvector`); `docker compose build --target pi` (or
 heavy ML stack and disables NER/embeddings via the `FEATURE_*` flags. They share one
 Postgres database and talk over the compose network.
 
-| Service     | Image (built from `.`)          | RAM     | Role |
-|-------------|--------------------------------|---------|------|
-| `postgres`  | `pgvector/pgvector:pg16`       | 1 GB    | PostgreSQL 16 + `pgvector` + full-text search. Persistent `pgdata` volume. |
-| `migrate`   | same image                     | —       | One-shot `alembic upgrade head` (runs before worker/ner at startup). |
-| `seed`      | same image                     | —       | One-shot `scripts/seed_sources.py` (loads `config/sources.yml`). |
-| `worker`    | `news-intelligence-worker`      | 1 GB    | Scheduler + fetch + extract + sentiment. |
-| `ner`       | `news-intelligence-worker`      | 2 GB    | GLiNER2 ONNX NER + knowledge-graph construction (model cached in `hf_cache`). |
-| `web`       | `news-intelligence-web`         | 512 MB  | FastAPI REST API (`:8000`). |
-| `frontend` | `news-intelligence-frontend`     | 128 MB  | React + Vite + Tailwind SPA (nginx) on `:8501`; proxies `/api/*` → `web:8000`. |
+| Service     | Image (GHCR / local build)      | RAM     | Role |
+|-------------|----------------------------------|---------|------|
+| `postgres`  | `pgvector/pgvector:pg16`        | 1 GB    | PostgreSQL 16 + `pgvector` + full-text search. Persistent `pgdata` volume. |
+| `migrate`   | `ghcr.io/sam1rshaban1/news-intelligence-worker` | — | One-shot `alembic upgrade head` (runs before worker/ner at startup). |
+| `seed`      | same image                       | —       | One-shot `scripts/seed_sources.py` (loads `config/sources.yml`). |
+| `worker`    | same image                       | 1 GB    | Scheduler + fetch + extract + sentiment. |
+| `ner`       | same image                       | 2 GB    | GLiNER2 ONNX NER + knowledge-graph construction (model cached in `hf_cache`). |
+| `web`       | same image                       | 512 MB  | FastAPI REST API (`:8000`). |
+| `frontend` | `ghcr.io/sam1rshaban1/news-intelligence-frontend` | 128 MB | React + Vite + Tailwind SPA (nginx) on `:8501`; proxies `/api/*` → `web:8000`. |
 
 > The `worker` and `ner` services use the **same image** but different commands
 > (`src.workers` vs `src.workers.ner_service`) so the heavy NER model never blocks
@@ -417,50 +464,78 @@ The `migrate` service runs `alembic upgrade head` automatically at startup (and
   configured news RSS feeds. For an offline/air-gapped deploy, pre-populate the
   `hf_cache` volume (see *Models & offline use* below).
 
-### On a laptop / build machine
+### Pre-built images (recommended)
+
+Images are published to GHCR when a version tag (`v*`) is pushed:
+
+| Image | Tags | Tier |
+|-------|------|------|
+| `ghcr.io/sam1rshaban1/news-intelligence-worker` | `latest`, `v0.1.0`, `0.1`, `pi`, `v0.1.0-pi` | Full stack (`vps`) or lightweight (`pi`) |
+| `ghcr.io/sam1rshaban1/news-intelligence-frontend` | `latest`, `v0.1.0`, `0.1` | React SPA |
+
+```bash
+cp .env.example .env
+docker compose pull
+docker compose up -d
+```
+
+Override image source or tag via `.env`:
+
+```bash
+NI_BACKEND_IMAGE=ghcr.io/sam1rshaban1/news-intelligence-worker
+NI_FRONTEND_IMAGE=ghcr.io/sam1rshaban1/news-intelligence-frontend
+NI_IMAGE_TAG=v0.1.0
+```
+
+For the Raspberry Pi compose file, the backend defaults to the `pi` tag:
+`NI_IMAGE_TAG=pi docker compose -f docker-compose.pi.yml pull`.
+
+### Build from source (developers)
+
+Use this when changing Python/frontend code or when pre-built images are unavailable:
 
 ```bash
 docker compose build            # source + Dockerfile changes are picked up automatically
 # add --no-cache only if you edit Python deps or the Dockerfile
+docker compose up -d
 ```
+
+Compose sets both `image:` (GHCR name) and `build:` — a local `build` tags the result
+with the same name, so dev and pull-based deploys share one workflow.
 
 ### Running locally (laptop)
 
-```bash
-cp .env.example .env            # create your local env (edit NEWS_API_KEY + POSTGRES_PASSWORD)
-docker compose up -d
-# frontend: http://localhost:8501   API: http://localhost:8000
-# API docs (Swagger UI): http://localhost:8000/docs   (Redoc: http://localhost:8000/redoc)
-```
-
-> **Set `NEWS_API_KEY`** in `.env` and keep the `frontend` port (8501) on a trusted
-> network only — by default the API and Postgres are bound to `127.0.0.1`, but the
-> frontend is the public entry point. Without `NEWS_API_KEY` the API is unauthenticated.
+Same as [Quick start](#quick-start) above. Set `NEWS_API_KEY` in `.env` and keep the
+`frontend` port (8501) on a trusted network only — by default the API and Postgres are
+bound to `127.0.0.1`, but the frontend is the public entry point. Without
+`NEWS_API_KEY` the API is unauthenticated.
 
 ### Deploying to a Raspberry Pi 4B (8 GB)
 
-Use the lightweight `pi` build target — `docker-compose.pi.yml` builds the `pi`
-Docker target (no ONNX / pgvector), disables NER + embeddings via the `FEATURE_*`
-flags, and uses plain `postgres:16`. Fetch/extract/sentiment (VADER + mk/sq/tr
-lexicon) still run, along with de-duplication, merge, and the full web UI + API.
+Use the lightweight `pi` tier — `docker-compose.pi.yml` pulls/builds the `pi` backend
+tag (no ONNX / pgvector), disables NER + embeddings via the `FEATURE_*` flags, and uses
+plain `postgres:16`. Fetch/extract/sentiment (VADER + mk/sq/tr lexicon) still run, along
+with de-duplication, merge, and the full web UI + API.
 
-1. Build on the laptop, then transfer images (no registry needed):
+**Option A — pull pre-built images (easiest):**
 
-   ```bash
-   docker compose -f docker-compose.pi.yml build --target pi
-   docker save news-intelligence-worker news-intelligence-web \
-     news-intelligence-frontend postgres:16 | gzip > ni_pi_images.tar.gz
-   scp ni_pi_images.tar.gz pi@<PI_IP>:/tmp/
-   ssh pi@<PI_IP> 'docker load < /tmp/ni_pi_images.tar.gz'
-   ```
+```bash
+cp .env.example .env
+NI_IMAGE_TAG=pi docker compose -f docker-compose.pi.yml pull
+docker compose -f docker-compose.pi.yml up -d
+```
 
-2. On the Pi:
+**Option B — build on a laptop, transfer without a registry:**
 
-   ```bash
-   docker compose -f docker-compose.pi.yml up -d postgres
-   docker compose -f docker-compose.pi.yml ps   # wait until postgres is "healthy"
-   docker compose -f docker-compose.pi.yml up -d # migrate + seed run automatically, then services start
-   ```
+```bash
+docker compose -f docker-compose.pi.yml build
+docker save ghcr.io/sam1rshaban1/news-intelligence-worker:pi \
+  ghcr.io/sam1rshaban1/news-intelligence-frontend:latest postgres:16 \
+  | gzip > ni_pi_images.tar.gz
+scp ni_pi_images.tar.gz pi@<PI_IP>:/tmp/
+ssh pi@<PI_IP> 'docker load < /tmp/ni_pi_images.tar.gz'
+docker compose -f docker-compose.pi.yml up -d
+```
 
 > On the Pi there is **no `ner` service** (entity extraction / knowledge-graph
 > building are disabled) and sentiment uses VADER + the mk/sq/tr lexicon (no
@@ -658,6 +733,7 @@ docker compose exec postgres psql -U news -d news_intelligence \
 │   └── workers/               # fetch/extract/sentiment loop + ner_service + lifecycle
 ├── tests/                    # pytest suite (requires a Postgres service)
 ├── requirements/             # pinned lockfiles (base.lock, vps.lock) + .in sources
-├── .github/                  # CI, release, PR/issue templates
+├── .github/                  # CI, release, docker-publish, PR/issue templates
+├── ROADMAP.md                # planned work and out-of-scope items
 └── scripts/                   # seed_sources.py, backfill_search_vector.py, merge_entities.py
 ```
