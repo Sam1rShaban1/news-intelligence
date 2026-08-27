@@ -11,6 +11,18 @@
 # Use the default `docker-compose.yml` (target `vps`) on a VPS for full features
 # (multilingual GLiNER2 NER, baked sentiment transformer, vector embeddings).
 
+# Pre-built pi-tier images: ghcr.io/sam1rshaban1/news-intelligence-worker:pi (or :v0.1.0-pi).
+x-backend-image: &backend-image
+  image: ${NI_BACKEND_IMAGE:-ghcr.io/sam1rshaban1/news-intelligence-worker}:${NI_IMAGE_TAG:-pi}
+  build:
+    target: pi
+
+x-frontend-image: &frontend-image
+  image: ${NI_FRONTEND_IMAGE:-ghcr.io/sam1rshaban1/news-intelligence-frontend}:${NI_IMAGE_TAG:-latest}
+  build:
+    context: ./ui
+    dockerfile: Dockerfile
+
 services:
   postgres:
     # Plain Postgres on the Pi (pgvector image has no arm64 build; embeddings are off).
@@ -32,8 +44,7 @@ services:
       retries: 5
 
   worker:
-    build:
-      target: pi
+    <<: *backend-image
     command: ["-m", "src.workers"]
     depends_on:
       postgres:
@@ -61,8 +72,7 @@ services:
       retries: 3
 
   migrate:
-    build:
-      target: pi
+    <<: *backend-image
     command: ["-m", "alembic", "upgrade", "head"]
     depends_on:
       postgres:
@@ -72,8 +82,7 @@ services:
     restart: "no"
 
   seed:
-    build:
-      target: pi
+    <<: *backend-image
     command: ["scripts/seed_sources.py"]
     depends_on:
       migrate:
@@ -86,8 +95,7 @@ services:
     restart: "no"
 
   web:
-    build:
-      target: pi
+    <<: *backend-image
     command: ["-m", "src.api.main"]
     depends_on:
       postgres:
@@ -108,9 +116,7 @@ services:
       retries: 3
 
   frontend:
-    build:
-      context: ./ui
-      dockerfile: Dockerfile
+    <<: *frontend-image
     depends_on:
       - web
     environment:

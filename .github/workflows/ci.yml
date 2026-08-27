@@ -37,17 +37,44 @@ jobs:
       - name: Lint (ruff)
         run: ruff check src/ config/ tests/ scripts/
       - name: Type check (mypy, advisory)
-        # Advisory for now: surfaces type issues without blocking the pipeline.
+        # Advisory on purpose: the SQLAlchemy code has many mypy-stub false
+        # positives (e.g. "FromClause has no attribute 'delete'") that are not
+        # real bugs. This still surfaces genuinely new type issues in diffs.
         continue-on-error: true
         run: mypy src/
       - name: Alembic migrate
         run: python -m alembic upgrade head
       - name: Tests
         run: pytest -q --cov=src --cov-report=term-missing
-      - name: Dependency audit (pip-audit, advisory)
-        # Advisory: reports known CVEs in pinned deps without failing the build.
-        continue-on-error: true
+      - name: Dependency audit (pip-audit, blocking)
+        # Fails the build on ANY known vulnerability in the pinned dependency
+        # tree. Keep deps patched; use --ignore-vuln <ID> only for documented,
+        # accepted risks.
         run: pip-audit -r requirements/base.lock -r requirements/vps.lock
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - name: Install (allowlist esbuild build via ui/.npmrc)
+        run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm typecheck
+      - name: Tests
+        run: pnpm test
+      - name: Build
+        run: pnpm build
 
   docker-build:
     runs-on: ubuntu-latest

@@ -1,3 +1,16 @@
+# Pre-built images are published to GHCR on each release tag (see .github/workflows/docker-publish.yml).
+# Override with NI_BACKEND_IMAGE / NI_FRONTEND_IMAGE / NI_IMAGE_TAG in .env if needed.
+x-backend-image: &backend-image
+  image: ${NI_BACKEND_IMAGE:-ghcr.io/sam1rshaban1/news-intelligence-worker}:${NI_IMAGE_TAG:-latest}
+  build:
+    target: vps
+
+x-frontend-image: &frontend-image
+  image: ${NI_FRONTEND_IMAGE:-ghcr.io/sam1rshaban1/news-intelligence-frontend}:${NI_IMAGE_TAG:-latest}
+  build:
+    context: ./ui
+    dockerfile: Dockerfile
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -18,8 +31,7 @@ services:
       retries: 5
 
   worker:
-    build:
-      target: vps
+    <<: *backend-image
     command: ["-m", "src.workers"]
     depends_on:
       postgres:
@@ -43,8 +55,7 @@ services:
       retries: 3
 
   ner:
-    build:
-      target: vps
+    <<: *backend-image
     command: ["-m", "src.workers.ner_service"]
     depends_on:
       postgres:
@@ -73,8 +84,7 @@ services:
       retries: 3
 
   migrate:
-    build:
-      target: vps
+    <<: *backend-image
     # Retry the DB connection briefly: on a cold start the embedded Docker DNS
     # may not have registered `postgres` yet, which otherwise fails the run.
     entrypoint: ["sh", "-c"]
@@ -87,8 +97,7 @@ services:
     restart: "no"
 
   seed:
-    build:
-      target: vps
+    <<: *backend-image
     command: ["scripts/seed_sources.py"]
     depends_on:
       migrate:
@@ -101,8 +110,7 @@ services:
     restart: "no"
 
   alerts:
-    build:
-      target: vps
+    <<: *backend-image
     command: ["-m", "src.workers.alerts_service"]
     depends_on:
       postgres:
@@ -125,8 +133,7 @@ services:
       retries: 3
 
   embeddings:
-    build:
-      target: vps
+    <<: *backend-image
     command: ["-m", "src.workers.embeddings_service"]
     depends_on:
       postgres:
@@ -149,8 +156,7 @@ services:
       retries: 3
 
   web:
-    build:
-      target: vps
+    <<: *backend-image
     command: ["-m", "src.api.main"]
     depends_on:
       postgres:
@@ -170,9 +176,7 @@ services:
       retries: 3
 
   frontend:
-    build:
-      context: ./ui
-      dockerfile: Dockerfile
+    <<: *frontend-image
     depends_on:
       - web
     environment:
