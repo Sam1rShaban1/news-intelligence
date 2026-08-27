@@ -10,10 +10,14 @@ from src.db.models import Base
 
 config = context.config
 
-# Override sqlalchemy.url from environment variable if available
+# Build the DB URL from the environment. NEWS_DATABASE_URL takes precedence;
+# otherwise compose it from POSTGRES_PASSWORD so no credential is hardcoded in
+# alembic.ini.
 db_url = os.environ.get("NEWS_DATABASE_URL")
-if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+if not db_url:
+    pw = os.environ.get("POSTGRES_PASSWORD", "news")
+    db_url = f"postgresql://news:{pw}@postgres:5432/news_intelligence"
+config.set_main_option("sqlalchemy.url", db_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
