@@ -49,9 +49,12 @@ an individual is officially representing the community in public spaces.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement by opening a
-public GitHub issue. All complaints will be reviewed and investigated promptly
-and fairly.
+reported privately and confidentially to the project maintainers using
+**GitHub's Private Vulnerability Reporting / "Report a concern" flow** on the
+repository's *Security* tab, or to the maintainers' security contact. Do **not**
+open a public issue for conduct reports — they are handled in private so
+reporters are not exposed. All complaints will be reviewed and investigated
+promptly and fairly.
 
 ## Attribution
 
