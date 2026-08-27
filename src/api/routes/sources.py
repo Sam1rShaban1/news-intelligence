@@ -5,8 +5,11 @@ enable/disable, soft-delete, and test feeds from the UI. The YAML seed remains
 only as initial bootstrap. No auth in this build (multi-tenant auth is planned).
 """
 
+import logging
 from datetime import datetime, timezone
 from types import SimpleNamespace
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel
@@ -238,5 +241,6 @@ def test_source(
     try:
         entries = discover_articles(probe)
     except Exception as e:  # surface any discovery failure to the UI
-        return {"ok": False, "error": str(e)[:500], "entries": []}
+        logger.warning("Source test failed for %s: %s", source.name, e)
+        return {"ok": False, "error": "fetch failed; check the source URL and connectivity", "entries": []}
     return {"ok": True, "count": len(entries), "sample": entries[:5]}
