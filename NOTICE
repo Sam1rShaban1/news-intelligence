@@ -25,14 +25,26 @@ Machine-learning models
 Backend libraries
 -----------------
 - ONNX Runtime (Microsoft) — MIT
-- FastAPI, SQLAlchemy, Alembic, Pydantic, Uvicorn, HTTPX,
-  feedparser, newspaper4k, APScheduler, pgvector, psycopg2 — see
-  respective upstream licenses (mostly MIT/BSD).
+- FastAPI, Uvicorn, Pydantic, Pydantic-Settings, SQLAlchemy, Alembic,
+  HTTPX, feedparser, newspaper4k, APScheduler, tokenizers, langid — MIT
+- psycopg2 (used via psycopg2-binary) — LGPL-3.0 with a linking exception
+  (weak copyleft; dynamically linked, does not affect this Apache-2.0 project).
+  The full license text is at https://www.gnu.org/licenses/lgpl-3.0.html.
+- pgvector — PostgreSQL License (a permissive BSD-style license).
+- Beautiful Soup 4 (beautifulsoup4) — MIT
+- lxml — BSD-3-Clause
+- NLTK — Apache-2.0
+- ReportLab — BSD-3-Clause
 
 Frontend libraries
 ------------------
-- React, React DOM, Vite, Tailwind CSS — MIT
-- d3-force, d3-zoom, d3-selection — BSD-3-Clause
-- louvain (js-louvain, community detection) — MIT
+- React, React DOM, Vite, Tailwind CSS, js-louvain, motion — MIT
+- d3-force, d3-zoom, d3-selection, d3-scale, d3-shape — BSD-3-Clause
+- clsx, tailwind-merge — MIT
+- dither-kit (vendored in ui/src/components/dither-kit/) — MIT
+  Author: Boring Software Inc. (@grimcodes)
+  Source: https://github.com/Boring-Software-Inc/dither-kit
+  The MIT permission notice for this component is reproduced in
+  ui/src/components/dither-kit/THIRD_PARTY_LICENSE.
 
 The full text of the Apache License 2.0 is provided in the LICENSE file.
