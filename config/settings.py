@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     zombie_timeout_minutes: int = 5
     max_retries: int = 3
 
+    # NER service tuning (the separate `ner` worker)
+    ner_batch_size: int = 50
+    ner_poll_interval: float = 2.0
+    ner_zombie_min: int = 5
+    ner_max_retries: int = 3
+
     # HTTP
     http_timeout: int = 15
     user_agent: str = (
@@ -34,6 +40,13 @@ class Settings(BaseSettings):
 
     # GLiNER2 ONNX model (multilingual NER, runs in the separate `ner` service)
     gliner_model: str = "lmo3/gliner2-multi-v1-onnx"
+    # Pinned model-repo revision (commit) for reproducible downloads. Update this
+    # when you intentionally upgrade the NER model.
+    gliner_model_revision: str = "e52892db1d20f0c2ac18e3c7f00b1569fa2fa895"
+    # Optional supply-chain check: sha256 of any one of the model's `.onnx` files.
+    # Leave empty to skip verification. The loader refuses to use the model if no
+    # `.onnx` file matches this value.
+    gliner_model_sha256: str = ""
 
     # Sentiment: auto = transformer if model present else lexicon/VADER;
     # transformer = force ONNX (falls back if missing); lexicon = skip ONNX.
