@@ -5,48 +5,52 @@ from datetime import datetime, timezone
 from typing import Any
 
 import feedparser
-import httpx
 from bs4 import BeautifulSoup
 
 from config.settings import settings
-from src.collector.ssrf import is_safe_url
+from src.collector.ssrf import is_safe_url, safe_fetch
 
 logger = logging.getLogger(__name__)
 
-# Reusable client with connection pooling
-_client: httpx.Client | None = None
 
+def _fetch_text(url: str) -> str | None:
+    """Fetch `url` and return its body decoded as text.
 
-def _get_client() -> httpx.Client:
-    global _client
-    if _client is None or _client.is_closed:
-        _client = httpx.Client(
+    Uses the SSRF-guarded ``safe_fetch``: the connection is pinned to a
+    pre-resolved, blocklist-checked IP and *every* redirect hop is re-validated,
+    which defeats DNS-rebinding and redirect-based SSRF (e.g. to cloud metadata
+    endpoints at 169.254.169.254). Returns ``None`` on any network error, a
+    blocked/unsafe host, or a non-2xx status.
+    """
+    try:
+        result = safe_fetch(
+            url,
             timeout=settings.http_timeout,
-            headers={"User-Agent": settings.user_agent},
-            follow_redirects=True,
-            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            user_agent=settings.user_agent,
         )
-    return _client
-
-
-def close_client() -> None:
-    global _client
-    if _client is not None and not _client.is_closed:
-        _client.close()
-        _client = None
+    except (ValueError, OSError) as e:
+        logger.warning("Blocked/unsafe fetch %s: %s", url, e)
+        return None
+    if result.status >= 400:
+        logger.warning("Fetch %s returned status %s", url, result.status)
+        return None
+    charset = "utf-8"
+    for key, value in result.headers:
+        if key.lower() == "content-type" and "charset=" in value:
+            charset = value.split("charset=")[-1].split(";")[0].strip()
+    try:
+        return result.body.decode(charset, "replace")
+    except (LookupError, UnicodeDecodeError):
+        return result.body.decode("utf-8", "replace")
 
 
 def fetch_rss_entries(rss_url: str, source_url: str) -> list[dict[str, Any]]:
     """Parse an RSS feed and return raw article dicts."""
-    client = _get_client()
-    try:
-        resp = client.get(rss_url)
-        resp.raise_for_status()
-    except httpx.HTTPError as e:
-        logger.warning("Failed to fetch RSS %s: %s", rss_url, e)
+    text = _fetch_text(rss_url)
+    if not text:
         return []
 
-    feed = feedparser.parse(resp.text)
+    feed = feedparser.parse(text)
     entries = []
     for entry in feed.entries:
         link = entry.get("link", "")
@@ -76,15 +80,12 @@ def fetch_rss_entries(rss_url: str, source_url: str) -> list[dict[str, Any]]:
 
 def fetch_sitemap_urls(source_url: str, sitemap_path: str = "/sitemap.xml") -> list[str]:
     """Try to discover article URLs from a sitemap.xml."""
-    client = _get_client()
     sitemap_url = source_url.rstrip("/") + sitemap_path
-    try:
-        resp = client.get(sitemap_url)
-        resp.raise_for_status()
-    except httpx.HTTPError:
+    text = _fetch_text(sitemap_url)
+    if not text:
         return []
 
-    soup = BeautifulSoup(resp.text, "lxml-xml")
+    soup = BeautifulSoup(text, "lxml-xml")
     urls = []
     for loc in soup.find_all("loc"):
         url = loc.get_text(strip=True)
@@ -98,11 +99,13 @@ def discover_articles(source: Any) -> list[dict[str, Any]]:
     Discover articles for a source.
     Priority: RSS → Sitemap → Homepage fallback.
     Returns list of dicts with keys: url, title, published_date, author, summary.
+
+    The initial ``is_safe_url`` check rejects misconfigured/bad operator-supplied
+    URLs up front; every subsequent network fetch goes through the SSRF-guarded
+    ``safe_fetch`` (see ``_fetch_text``), which also defeats redirect-based SSRF.
     """
     entries: list[dict[str, Any]] = []
 
-    # SSRF guard: never fetch operator/user-supplied URLs that resolve to internal
-    # addresses. Seeded sources are public, so this only rejects misconfigured/bad ones.
     if not is_safe_url(source.url) or (source.rss_url and not is_safe_url(source.rss_url)):
         logger.warning("Refusing to fetch unsafe source URL for %s", source.name)
         return []
@@ -127,15 +130,11 @@ def discover_articles(source: Any) -> list[dict[str, Any]]:
 
 def _scrape_homepage(source_url: str) -> list[dict[str, Any]]:
     """Last-resort: scrape homepage for article-like links."""
-    client = _get_client()
-    try:
-        resp = client.get(source_url)
-        resp.raise_for_status()
-    except httpx.HTTPError as e:
-        logger.warning("Homepage scrape failed for %s: %s", source_url, e)
+    text = _fetch_text(source_url)
+    if not text:
         return []
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(text, "html.parser")
     seen = set()
     articles = []
 

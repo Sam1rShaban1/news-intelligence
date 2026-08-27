@@ -5,7 +5,7 @@ Two layers of protection:
 1. `is_safe_url` — cheap parse-time check used when operators add a source. It
    rejects non-http(s) URLs, URLs with credentials, and any host that resolves to
    a private / loopback / link-local / reserved address. Unresolvable hosts are
-   allowed (the operator is responsible and the later fetch will simply fail).
+   rejected (fail closed).
 
 2. `safe_fetch` — used when fetching article content (untrusted URLs from feeds).
    It resolves the host up front, pins the connection to that IP (so DNS rebinding
@@ -83,7 +83,8 @@ def is_safe_url(url: str | None) -> bool:
     """Parse-time check for operator-supplied URLs (e.g. news sources).
 
     Rejects non-http(s), credentialed URLs, and hosts that resolve to a blocked
-    address. Unresolvable hosts are allowed (the later fetch fails anyway).
+    address. Unresolvable hosts are rejected (fail closed): a host we cannot
+    prove is safe must not be fetched.
     """
     if not url:
         return False
@@ -100,7 +101,7 @@ def is_safe_url(url: str | None) -> bool:
     try:
         infos = socket.getaddrinfo(parsed.hostname, None)
     except Exception:
-        return True
+        return False
     for info in infos:
         if _ip_is_blocked(info[4][0]):
             return False
