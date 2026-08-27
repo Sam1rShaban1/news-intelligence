@@ -326,10 +326,14 @@ template is provided in [`.env.example`](.env.example).
 | `NEWS_LOG_LEVEL` | `INFO` | Logging level. |
 | `NEWS_CONFIG_DIR` | `config` | Where `sources.yml` lives. |
 | `NEWS_GLINER_MODEL` | `lmo3/gliner2-multi-v1-onnx` | GLiNER2 ONNX model repo. |
+| `NEWS_GLINER_MODEL_REVISION` | `e52892db1d20f0c2ac18e3c7f00b1569fa2fa895` | Pinned model-repo commit for reproducible downloads. |
+| `NEWS_GLINER_MODEL_SHA256` | _(empty)_ | Optional sha256 of any one model `.onnx` file; loader refuses the model on mismatch. |
 | `NEWS_SENTIMENT_MODEL` | `auto` | `auto` \| `transformer` \| `lexicon`. |
 | `NEWS_SENTIMENT_MODEL_PATH` | `/app/models/sentiment.onnx` | Transformer ONNX path. |
-| `NEWS_NER_BATCH_SIZE` | `30` | Articles claimed per NER cycle (set to `50` on the `ner` service in `docker-compose.yml`). |
-| `NEWS_NER_POLL_INTERVAL` | `5` | Seconds the NER loop sleeps between cycles (set to `2` in compose). |
+| `NEWS_CORS_ORIGINS` | `http://localhost:3000,http://localhost:8501,http://127.0.0.1:8501` | Comma-separated allowed CORS origins (never `*` with credentials). |
+| `NEWS_FEATURE_NER` / `_EMBEDDINGS` / `_PDF_EXPORT` / `_ALERTS` | `true` | Toggle optional pipelines (the `pi` target disables NER + embeddings). |
+| `NEWS_NER_BATCH_SIZE` | `50` | Articles claimed per NER cycle (override per `ner` service in `docker-compose.yml`). |
+| `NEWS_NER_POLL_INTERVAL` | `2` | Seconds the NER loop sleeps between cycles. |
 | `NEWS_NER_ZOMBIE_MIN` | `5` | Reclaim `ner_running` articles stuck longer than this. |
 | `NEWS_NER_MAX_RETRIES` | `3` | NER retries before marking an article `failed`. |
 
@@ -467,12 +471,44 @@ lexicon) still run, along with de-duplication, merge, and the full web UI + API.
 ### First-run notes
 
 - **GLiNER2 model download:** the `ner` service downloads GLiNER2 ONNX into the
-  `hf_cache` volume **once** (~1.2 GB; ~20–30 min on a Pi, fast on a laptop) and caches
-  it across restarts. Watch with `docker compose logs -f ner`.
+  `hf_cache` volume **once** (~1.5–2 GB; ~20–30 min on a Pi, fast on a laptop) and caches
+  it across restarts. The model is pinned to a specific revision for reproducibility
+  (see *Models & offline use*). Watch with `docker compose logs -f ner`.
 - **Sentiment model** is already baked into the image (`/app/models`), so no download is
   needed for sentiment.
-- Disk budget on the Pi: ~1.5 GB × 2 images + ~1.2 GB GLiNER cache + Postgres data
+- Disk budget on the Pi: ~1.5 GB × 2 images + ~1.5–2 GB GLiNER cache + Postgres data
   (~6 GB free recommended).
+
+---
+
+## Models & offline use
+
+**GLiNER2 (NER) — runtime download, pinned for reproducibility.** The `ner`
+service fetches the multilingual GLiNER2 ONNX model from Hugging Face into the
+`hf_cache` volume on first start. The exact model commit is pinned via
+`NEWS_GLINER_MODEL_REVISION` (default `e52892db1d20f0c2ac18e3c7f00b1569fa2fa895`),
+so every deployment fetches the same weights. For supply-chain assurance, set
+`NEWS_GLINER_MODEL_SHA256` to the `sha256` of **any one** of the model's `.onnx`
+files (compute it with `sha256sum` on the cached file); the loader refuses to use
+the model if none of the `.onnx` files match.
+
+**Sentiment (transformer) — baked in.** The XLM-RoBERTa sentiment ONNX model is
+downloaded and **sha256-verified at image build time** (see `Dockerfile`), so no
+runtime download is needed for sentiment.
+
+**Air-gapped / offline deploy.** On a connected machine, let the `ner` service
+download once, then move the `hf_cache` volume to the target (or bake it into your
+own image). Because the revision is pinned, the same commit is used everywhere:
+
+```bash
+# On a connected machine, after the first `ner` run:
+docker run --rm -v news-intelligence_hf_cache:/data -v $PWD:/out busybox \
+  tar czf /out/hf_cache.tar.gz -C /data .
+# Copy hf_cache.tar.gz to the offline host and extract into its hf_cache volume.
+```
+
+> The `pi` target disables NER (`NEWS_FEATURE_NER=false`), so no GLiNER2 download
+> is required there.
 
 ---
 

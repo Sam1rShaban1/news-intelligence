@@ -46,6 +46,54 @@ DEFAULT_LABELS = ["person", "organization", "location", "city", "country", "even
 _model = None
 
 
+def _resolve_model_dir() -> str:
+    """Return a local path to the pinned GLiNER2 model snapshot.
+
+    Uses ``huggingface_hub.snapshot_download`` with the pinned ``revision`` so the
+    exact model commit is fetched (reproducible, supply-chain safe). Falls back to
+    the bare repo id if ``huggingface_hub`` isn't installed (e.g. the Pi target,
+    where NER is disabled anyway).
+    """
+    repo = settings.gliner_model
+    revision = settings.gliner_model_revision or None
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError:
+        logger.warning("huggingface_hub unavailable; loading %s without a pinned revision", repo)
+        return repo
+    return snapshot_download(repo_id=repo, revision=revision)
+
+
+def _verify_model_sha(model_dir: str) -> None:
+    """Verify the model against ``gliner_model_sha256`` if it is set.
+
+    Compares the expected sha256 against every ``.onnx`` file in the snapshot and
+    passes if any match. Raises ``ValueError`` on mismatch (fail closed).
+    """
+    import hashlib
+    from pathlib import Path
+
+    expected = settings.gliner_model_sha256.strip()
+    if not expected:
+        return
+    onnx_files = list(Path(model_dir).rglob("*.onnx"))
+    if not onnx_files:
+        logger.warning("No .onnx files in %s; skipping sha verification", model_dir)
+        return
+    for path in onnx_files:
+        digest = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                digest.update(chunk)
+        if digest.hexdigest() == expected:
+            logger.info("GLiNER2 model sha256 verified (%s)", path.name)
+            return
+    raise ValueError(
+        f"GLiNER2 model sha256 mismatch: expected {expected} but none of "
+        f"{[p.name for p in onnx_files]} matched"
+    )
+
+
 def _load_model():
     """Lazy-load GLiNER2 ONNX model (heavy, only load once)."""
     global _model
@@ -55,8 +103,10 @@ def _load_model():
     try:
         from gliner2_onnx import GLiNER2ONNXRuntime
 
-        logger.info("Loading GLiNER2 ONNX multilingual model: %s", settings.gliner_model)
-        _model = GLiNER2ONNXRuntime.from_pretrained(settings.gliner_model)
+        model_dir = _resolve_model_dir()
+        _verify_model_sha(model_dir)
+        logger.info("Loading GLiNER2 ONNX multilingual model from %s", model_dir)
+        _model = GLiNER2ONNXRuntime.from_pretrained(model_dir)
         logger.info("GLiNER2 ONNX model loaded")
     except Exception as e:
         logger.error("Failed to load GLiNER2 ONNX: %s", e)
