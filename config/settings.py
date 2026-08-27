@@ -6,7 +6,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = {"env_prefix": "NEWS_", "env_file": ".env"}
+    # Ignore unrecognised env vars (e.g. POSTGRES_PASSWORD supplied to the
+    # compose/migration context) so a local `.env` doesn't crash import.
+    model_config = {"env_prefix": "NEWS_", "env_file": ".env", "extra": "ignore"}
 
     # Database
     database_url: str = "postgresql://news:news@localhost:5432/news_intelligence"
