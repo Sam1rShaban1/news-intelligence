@@ -188,3 +188,12 @@ def test_semantic_search_disabled_and_short():
     r = _client.post("/search/semantic", json={"text": "a"})
     assert r.status_code == 400
 
+
+def test_worker_config_coerces_poll_interval_to_int():
+    from src.workers.lifecycle import WorkerConfig
+
+    config = WorkerConfig(poll_interval=2.0)
+
+    assert config.poll_interval == 2
+    assert isinstance(config.poll_interval, int)
+

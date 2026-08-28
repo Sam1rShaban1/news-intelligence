@@ -15,6 +15,13 @@ class WorkerConfig:
     zombie_timeout_minutes: int = 5  # stuck task threshold
     max_retries: int = 3
 
+    def __post_init__(self) -> None:
+        """Normalize worker timing values from env/config to integer seconds."""
+        self.poll_interval = int(self.poll_interval)
+        self.batch_size = int(self.batch_size)
+        self.zombie_timeout_minutes = int(self.zombie_timeout_minutes)
+        self.max_retries = int(self.max_retries)
+
 
 shutdown_event = Event()
 
