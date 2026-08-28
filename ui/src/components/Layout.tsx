@@ -38,13 +38,20 @@ export function Layout({ view, onNav, search, onSearch, online, children }: Layo
       >
         {/* Main header row */}
         <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', gap: 16 }}>
-          <div style={{ flexShrink: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.15em', lineHeight: 1 }}>
-              ▣ NI/MK
-            </div>
-            <div style={{ fontSize: 8, letterSpacing: '0.08em', color: '#555550', marginTop: 1 }}>
-              INTELLIGENCE BRIEFING
-            </div>
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+            <img
+              src="/logo.webp"
+              alt="News Intelligence logo"
+              style={{
+                display: 'block',
+                width: 42,
+                height: 42,
+                objectFit: 'contain',
+                borderRadius: 8,
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.25)',
+                background: '#f5f5f0',
+              }}
+            />
           </div>
           <div style={{ flex: 1, position: 'relative' }}>
             <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#555550' }}>⌕</span>
