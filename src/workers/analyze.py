@@ -19,7 +19,9 @@ def claim_articles(session, batch_size: int, zombie_timeout_minutes: int) -> lis
     currently being processed. After sentiment they move to 'sentiment_done'
     for the separate ner service.
     """
-    cutoff = text(f"now() - interval '{zombie_timeout_minutes} minutes'")
+    cutoff = text("now() - INTERVAL '1 minute' * :minutes").bindparams(
+        minutes=zombie_timeout_minutes
+    )
 
     query = (
         select(Article)

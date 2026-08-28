@@ -34,7 +34,9 @@ def claim_articles(session, batch_size: int, zombie_timeout_minutes: int) -> lis
     Claim articles ready for extraction using SELECT ... FOR UPDATE SKIP LOCKED.
     Returns claimed articles.
     """
-    cutoff = text(f"now() - interval '{zombie_timeout_minutes} minutes'")
+    cutoff = text("now() - INTERVAL '1 minute' * :minutes").bindparams(
+        minutes=zombie_timeout_minutes
+    )
 
     # Claim new articles or zombies (including our own in-progress state, so a
     # worker killed mid-extract is reclaimed after the zombie timeout).

@@ -10,13 +10,13 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select, text
 
+from config.settings import settings
 from src.db.models.article import Article
 from src.db.session import SessionLocal
 from src.nlp.graph import build_article_graph
 from src.nlp.ner import extract_entities
 from src.nlp.relations import build_relationships
 from src.nlp.stories import assign_story
-from config.settings import settings
 from src.workers.lifecycle import WorkerConfig, install_signal_handlers, is_shutdown_requested
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 
 def claim_articles(session, batch_size: int, zombie_timeout_minutes: int) -> list[Article]:
     """Claim articles whose sentiment is done and are awaiting NER."""
-    cutoff = text(f"now() - interval '{zombie_timeout_minutes} minutes'")
+    cutoff = text("now() - INTERVAL '1 minute' * :minutes").bindparams(
+        minutes=zombie_timeout_minutes
+    )
 
     query = (
         select(Article)
