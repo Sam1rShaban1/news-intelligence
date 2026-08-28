@@ -13,10 +13,10 @@ import os
 import time
 
 import pytest
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
+from alembic import command
 from src.db.models import Base
 
 MIG_DB = "news_intelligence_mig_check"
@@ -46,12 +46,14 @@ def test_migrations_match_models():
             f"grant CREATEDB to the test role to enable it."
         )
 
-    mig_url = str(admin.url).rsplit("/", 1)[0] + "/" + db_name
+    mig_url = admin.url.set(database=db_name)
     # alembic/env.py resolves the URL from NEWS_DATABASE_URL, so point it at the
-    # throwaway database for the duration of the migration run.
-    os.environ["NEWS_DATABASE_URL"] = mig_url
+    # throwaway database for the duration of the migration run. Use the unmasked
+    # string form — str() masks the password as "***" and would break auth.
+    mig_url_str = mig_url.render_as_string(hide_password=False)
+    os.environ["NEWS_DATABASE_URL"] = mig_url_str
     cfg = Config("alembic.ini")
-    cfg.set_main_option("sqlalchemy.url", mig_url)
+    cfg.set_main_option("sqlalchemy.url", mig_url_str)
     insp_engine = None
     try:
         command.upgrade(cfg, "head")

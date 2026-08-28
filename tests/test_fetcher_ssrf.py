@@ -9,8 +9,6 @@ pivoted. Also confirms ``is_safe_url`` now fails closed on unresolvable hosts.
 import types
 from unittest import mock
 
-import pytest
-
 from src.collector import fetcher
 from src.collector.fetcher import discover_articles
 from src.collector.ssrf import is_safe_url

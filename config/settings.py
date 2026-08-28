@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # NER service tuning (the separate `ner` worker)
     ner_batch_size: int = 50
-    ner_poll_interval: float = 2.0
+    ner_poll_interval: int = 2
     ner_zombie_min: int = 5
     ner_max_retries: int = 3
 
