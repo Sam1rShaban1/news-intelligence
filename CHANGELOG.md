@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — 2026-08-30
+
+Production readiness hardening patch.
+
+### Added
+- **SSRF guard regression test** — verifies the feed-URL safety check blocks
+  non-http(s) and internal/loopback targets.
+- **Migration drift guard** — a test that fails CI if the SQLAlchemy models and
+  Alembic migrations ever fall out of sync.
+- **Frontend typecheck + smoke tests** — Vitest suite and `pnpm typecheck`
+  wired into CI.
+- **Multi-arch container images** — the `pi` and frontend images are now built
+  for `linux/arm64` in addition to `linux/amd64`, and all images are published
+  to GHCR on every `v*` release tag (with `v`-prefixed tags so compositional
+  `NI_IMAGE_TAG=v0.1.2` pinning works as documented).
+
+### Changed
+- CI `pip-audit` is now blocking (no new vulnerable dependencies).
+- SQL interval clauses in the ingest and NER workers use bound parameters
+  instead of f-strings (SQL-injection hygiene).
+- Worker timing configuration values are coerced to integers at startup.
+- Frontend adds a favicon and a soft logo drop shadow.
+
+### Security
+- No new attack surface; the SSRF guard, non-root containers, pinned
+  dependencies, and constant-time API-key compare from earlier releases remain
+  in place.
+
 ## [0.1.0] — 2026-08-23
 
 First public release of News Intelligence — a self-hosted, multilingual news
@@ -53,3 +81,4 @@ intelligence platform for North Macedonia (MK / SQ / EN / TR).
   in their original language.
 
 [0.1.0]: https://github.com/Sam1rShaban1/news-intelligence/releases/tag/v0.1.0
+[0.1.2]: https://github.com/Sam1rShaban1/news-intelligence/releases/tag/v0.1.2
