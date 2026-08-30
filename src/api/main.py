@@ -11,8 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from config.settings import settings
 from src.api.deps import require_api_key
 from src.api.routes import articles_router, health_router, search_router
-from src.api.routes.analytics import router as analytics_router
 from src.api.routes.alerts import router as alerts_router
+from src.api.routes.analytics import router as analytics_router
 from src.api.routes.entities import router as entities_router
 from src.api.routes.export import router as export_router
 from src.api.routes.graph import router as graph_router

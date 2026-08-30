@@ -1,6 +1,5 @@
 """Alerts API — manage journalist alert rules and browse the alerts they fire."""
 
-from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query

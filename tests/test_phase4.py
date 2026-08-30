@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.db.models.alert import Alert, AlertRule
 from src.db.models.article import Article
 from src.db.models.entity import Entity
 from src.db.models.entity_node import EntityNode
@@ -45,7 +44,12 @@ def test_alerts_keyword_and_sentiment():
 
     r = _client.post(
         "/alerts/rules",
-        json={"name": "Corruption", "query": "corruption", "languages": ["en"], "min_sentiment": -0.3},
+        json={
+            "name": "Corruption",
+            "query": "corruption",
+            "languages": ["en"],
+            "min_sentiment": -0.3,
+        },
     )
     assert r.status_code == 200, r.text
     rule_id = r.json()["id"]
@@ -79,9 +83,17 @@ def test_alerts_entity_filter():
         n = EntityNode(canonical_text="Jane Minister", label="PER", mention_count=1)
         db.add(n)
         db.flush()
-        db.add(Entity(article_id=a.id, node_id=n.id, text="Jane Minister", label="PER", confidence=0.9))
+        db.add(
+            Entity(
+                article_id=a.id,
+                node_id=n.id,
+                text="Jane Minister",
+                label="PER",
+                confidence=0.9,
+            )
+        )
         db.commit()
-        nid, aid = n.id, a.id
+        nid = n.id
 
     r = _client.post("/alerts/rules", json={"name": "Watch Jane", "entity_node_id": nid})
     assert r.status_code == 200
@@ -146,9 +158,9 @@ def test_pdf_export_article():
     assert r.headers["content-type"].startswith("application/pdf")
     assert r.content[:4] == b"%PDF"
 
-    r = _client.get(f"/export/stories/999999/pdf")
+    r = _client.get("/export/stories/999999/pdf")
     assert r.status_code == 404
-    r = _client.get(f"/export/articles/999999/pdf")
+    r = _client.get("/export/articles/999999/pdf")
     assert r.status_code == 404
 
 
@@ -158,7 +170,7 @@ def test_semantic_search():
     with SessionLocal() as db:
         sid = _source(db, name="SemSrc", url="https://example.com/sem")
         a1 = _article(db, sid, "economy inflation prices rise", day=0, lang="en")
-        a2 = _article(db, sid, "sports football match result", day=1, lang="en")
+        _article(db, sid, "sports football match result", day=1, lang="en")
         db.commit()
         aid1 = a1.id
 

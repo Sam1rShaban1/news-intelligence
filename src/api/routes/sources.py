@@ -9,8 +9,6 @@ import logging
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-logger = logging.getLogger(__name__)
-
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -21,6 +19,8 @@ from src.collector.fetcher import discover_articles
 from src.collector.ssrf import is_safe_url
 from src.db.models.article import Article
 from src.db.models.source import Source
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
@@ -242,5 +242,9 @@ def test_source(
         entries = discover_articles(probe)
     except Exception as e:  # surface any discovery failure to the UI
         logger.warning("Source test failed for %s: %s", source.name, e)
-        return {"ok": False, "error": "fetch failed; check the source URL and connectivity", "entries": []}
+        return {
+            "ok": False,
+            "error": "fetch failed; check the source URL and connectivity",
+            "entries": [],
+        }
     return {"ok": True, "count": len(entries), "sample": entries[:5]}
