@@ -26,9 +26,11 @@ def test_list_empty(client):
 
 
 def test_create_and_list(client):
+    # Public IP literals (not *.example.com, which resolvers map to loopback and
+    # the SSRF guard correctly refuses) so the URL check is deterministic.
     r = client.post(
         "/sources",
-        json={"name": "B BC", "url": "https://bbc.example.com", "rss_url": "https://bbc.example.com/rss"},
+        json={"name": "B BC", "url": "https://1.1.1.1/feed", "rss_url": "https://1.1.1.1/rss"},
     )
     assert r.status_code == 200
     data = r.json()
@@ -42,8 +44,8 @@ def test_create_and_list(client):
 
 def test_duplicate_url_rejected(client):
     with SessionLocal() as db:
-        _make(db, url="https://dup.example.com")
-    r = client.post("/sources", json={"name": "X", "url": "https://dup.example.com"})
+        _make(db, url="https://8.8.8.8/dup")
+    r = client.post("/sources", json={"name": "X", "url": "https://8.8.8.8/dup"})
     assert r.status_code == 400
 
 
@@ -99,7 +101,7 @@ def test_test_endpoint_uses_discovery(monkeypatch):
     monkeypatch.setattr(sroute, "discover_articles", fake_discover)
 
     with SessionLocal() as db:
-        sid = _make(db, url="https://probe.example.com", rss_url="https://probe.example.com/rss")
+        sid = _make(db, url="https://9.9.9.9/probe", rss_url="https://9.9.9.9/rss")
 
     with TestClient(app) as c:
         r = c.post(f"/sources/{sid}/test")

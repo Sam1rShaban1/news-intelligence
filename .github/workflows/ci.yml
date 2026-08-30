@@ -83,4 +83,4 @@ jobs:
       - name: Build vps tier (includes verified model bake)
         run: docker compose build web
       - name: Build pi tier
-        run: docker compose build --target pi
+        run: docker compose -f docker-compose.pi.yml build worker
