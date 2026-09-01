@@ -104,10 +104,18 @@ def _load_model():
     try:
         from gliner2_onnx import GLiNER2ONNXRuntime
 
-        model_dir = _resolve_model_dir()
-        _verify_model_sha(model_dir)
-        logger.info("Loading GLiNER2 ONNX multilingual model from %s", model_dir)
-        _model = GLiNER2ONNXRuntime.from_pretrained(model_dir)
+        # Use the library's Hub helper directly — it handles the filtered
+        # snapshot_download (only the required precision's ONNX files) and
+        # the pinned revision. _resolve_model_dir is kept for sha verification
+        # when gliner_model_sha256 is set, but not for the actual load.
+        if settings.gliner_model_sha256.strip():
+            sha_dir = _resolve_model_dir()
+            _verify_model_sha(sha_dir)
+
+        repo = settings.gliner_model
+        revision = settings.gliner_model_revision or None
+        logger.info("Loading GLiNER2 ONNX multilingual model %s (revision=%s)", repo, revision)
+        _model = GLiNER2ONNXRuntime.from_pretrained(repo, revision=revision)
         logger.info("GLiNER2 ONNX model loaded")
     except Exception as e:
         logger.error("Failed to load GLiNER2 ONNX: %s", e)
