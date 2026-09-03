@@ -1,0 +1,57 @@
+# REQ-4.3 same-script — Latin queries matching Latin articles (EN/SQ/TR + latinized MK)
+# One query per line, realistic entity/topical terms from the live entity table (rerun build_query_sets to refresh).
+Skopje
+Tirana
+Pristina
+Ohrid
+Berlin
+Macedonia
+Albania
+Kosovo
+Government
+Parliament
+Election
+President
+Minister
+European Union
+NATO
+Economy
+Inflation
+Energy
+Health
+Education
+Culture
+Tourism
+Technology
+Police
+Court
+Protest
+University
+Football
+Vardar
+Shkupi
+Tetovo
+Kumanovo
+Struga
+Bitola
+Prilep
+Gostivar
+Debar
+Kicevo
+Kavadarci
+Negotino
+Gevgelija
+Strumica
+Kocani
+Kratovo
+Kriva Palanka
+Berovo
+Delcevo
+Vinica
+Radovis
+Valandovo
+Bogdanci
+Demir Kapija
+Shtip
+Veles
+# Keep ≥50; 50-100 ideal.

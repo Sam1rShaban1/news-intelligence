@@ -1,0 +1,57 @@
+# REQ-4.4 cross-script — Latin transliterations expected to match Cyrillic MK articles
+# Latin forms of Cyrillic entity names; should hit via normalize_text transliteration.
+Skopje
+Ohrid
+Bitola
+Kumanovo
+Tetovo
+Makedonija
+Vlada
+Sobranie
+Skopski
+Vardar
+Pelister
+Bregalnica
+Polog
+Prespa
+Dojran
+Kumanovska
+Tetovska
+Strumica
+Gevgelija
+Kavadarci
+Negotino
+Prilep
+Kicevo
+Struga
+Debar
+Gostivar
+Kratovo
+Kocani
+Stip
+Veles
+Krivopalanka
+Berovo
+Delcevo
+Vinica
+Radovis
+Valandovo
+Bogdanci
+Demir Kapija
+Krushevo
+Mavrovo
+Shar
+Korab
+Baba
+Jakupica
+Osogovo
+Belasica
+Kozjak
+Vodno
+Markovi Prilep
+Samuil
+# Cyrillic originals also valid — normalization makes either script match:
+# Скопје
+# Охрид
+# Тетово
+# Keep ≥50; 50-100 ideal.

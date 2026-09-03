@@ -1,0 +1,102 @@
+# provenance: {"date_run": "2026-09-03T21:53:17.682540+00:00", "git_commit": "unknown", "hardware": {"platform": "Linux-7.1.3-arch1-2-x86_64-with-glibc2.41", "machine": "x86_64", "processor": "unknown", "cpu_count": 16, "python": "3.14.7", "mem_total": "MemTotal:       16052400 kB", "tier_hint": "vps-or-unknown"}, "docker_images": {"backend_image": "ghcr.io/sam1rshaban1/news-intelligence-worker", "frontend_image": "ghcr.io/sam1rshaban1/news-intelligence-frontend", "image_tag": "latest"}, "seed": 42, "python_argv": ["eval/sample_merges.py", "--strategy", "similarity", "--n", "100", "--seed", "42", "--out", "eval/merges_similarity.csv"], "params": {"strategy": "similarity", "threshold": 0.8}}
+a_id,b_id,a_text,b_text,a_normalized,b_normalized,similarity_or_weight,languages,strategy,label
+4236,1383,pacienti,pacient,pacienti,pacient,1.0,,similarity,correct_merge
+2851,2853,rrjeti kombetar bujqesor,rrjet kombetar bujqesor,rrjeti kombetar bujqesor,rrjet kombetar bujqesor,0.979,sq,similarity,correct_merge
+1205,1459,pozhar,pozharot,pozhar,pozharot,0.857,mk,similarity,correct_merge
+1650,5765,kumanovo,kumanoves,kumanovo,kumanoves,0.824,"mk,sq",similarity,correct_merge
+1910,885,portland,poland,portland,poland,0.857,"en,mk",similarity,false_merge
+4688,5406,kalvin klajn,madelin klajn,kalvin klajn,madelin klajn,0.8,mk,similarity,false_merge
+2025,5133,bliznaci,bliznacite,bliznaci,bliznacite,0.889,mk,similarity,correct_merge
+4178,4754,holandski,holand,holandski,holand,0.8,mk,similarity,correct_merge
+2764,2773,gjyqit,gjyqet,gjyqit,gjyqet,1.0,tr,similarity,correct_merge
+2201,2153,kosova,kosove,kosova,kosove,1.0,"sq,tr",similarity,correct_merge
+282,285,popetrervski,popetreski,popetrervski,popetreski,0.909,en,similarity,ambiguous
+542,2304,tirana,tirane,tirana,tirane,1.0,"en,sq",similarity,correct_merge
+2518,5646,luftes ne iran,luftes me iranin,luftes ne iran,luftes me iranin,0.867,sq,similarity,false_merge
+936,3460,eu accession,succession,eu accession,succession,0.818,tr,similarity,false_merge
+2365,4585,zelensky,zelenski,zelensky,zelenski,0.875,"mk,sq",similarity,correct_merge
+2494,4258,instituti kroat i shendetit publik,instituti i shendetit publik,instituti kroat i shendetit publik,instituti i shendetit publik,0.903,sq,similarity,false_merge
+537,5044,aleksandar litovski,aleksandar nikoloski,aleksandar litovski,aleksandar nikoloski,0.821,,similarity,false_merge
+2492,2814,italine,itali,italine,itali,0.833,sq,similarity,correct_merge
+5003,5475,tutunski kombinat prilep,tutunski kombinat,tutunski kombinat prilep,tutunski kombinat,0.829,mk,similarity,correct_merge
+4061,4727,kenija,akedonija,kenija,akedonija,0.8,"en,mk",similarity,false_merge
+2356,2286,rusi,rus,rusi,rus,0.857,sq,similarity,correct_merge
+1788,3188,latvija,slavija,latvija,slavija,0.857,mk,similarity,false_merge
+1455,5025,krushevica,krushevice,krushevica,krushevice,1.0,"mk,sq",similarity,correct_merge
+2154,2153,kosoves,kosove,kosoves,kosove,0.923,"sq,tr",similarity,correct_merge
+5675,1587,siri,sirija,siri,sirija,0.8,mk,similarity,correct_merge
+5528,5539,finlanda,irlanda,finlanda,irlanda,0.8,sq,similarity,false_merge
+2172,2843,veriut,veriu,veriut,veriu,0.909,sq,similarity,correct_merge
+2786,5750,buzalkove,bukove,buzalkove,bukove,0.8,sq,similarity,ambiguous
+1055,4722,romanija,ermanija,romanija,ermanija,0.875,mk,similarity,false_merge
+2780,2582,mali i sharrit,mali sharr,mali i sharrit,mali sharr,0.833,sq,similarity,correct_merge
+1212,5540,ungarija,hungaria,ungarija,hungaria,0.875,"mk,sq",similarity,correct_merge
+2240,2242,kievin,kievi,kievin,kievi,0.909,sq,similarity,correct_merge
+2757,5518,epidemine,epidemia,epidemine,epidemia,0.824,sq,similarity,correct_merge
+1019,6045,ljupcho nikolovski,ljupcho dimovski,ljupcho nikolovski,ljupcho dimovski,0.824,"mk,tr",similarity,false_merge
+975,968,slobodna evropa,radio slobodna evropa,slobodna evropa,radio slobodna evropa,0.833,mk,similarity,correct_merge
+1107,2053,dia,da,dia,da,0.8,mk,similarity,ambiguous
+5677,2648,ministria e jashtme e sirise,ministrise se jashtme te iranit,ministria e jashtme e sirise,ministrise se jashtme te iranit,0.814,tr,similarity,false_merge
+895,495,hungarian parliamentary elections,parliamentary elections,hungarian parliamentary elections,parliamentary elections,0.821,en,similarity,false_merge
+1404,1930,ai,nai,ai,nai,0.8,mk,similarity,ambiguous
+2047,4352,zapadniot balkan,zapadnom balkanu,zapadniot balkan,zapadnom balkanu,0.875,mk,similarity,correct_merge
+223,3069,turkiye,urkiye,turkiye,urkiye,0.923,"en,tr",similarity,correct_merge
+2403,2328,bashkimi evropian,bashkimi europian,bashkimi evropian,bashkimi europian,0.941,"sq,tr",similarity,correct_merge
+4154,5553,lumi vardar,lumit vardar,lumi vardar,lumit vardar,0.957,sq,similarity,correct_merge
+203,3482,canada,canadian,canada,canadian,0.857,en,similarity,false_merge
+1828,1830,ou aleksandar makedonski,aleksandar makedonski,ou aleksandar makedonski,aleksandar makedonski,0.933,mk,similarity,correct_merge
+191,3646,region,oregon,region,oregon,0.833,"en,tr",similarity,false_merge
+360,364,mother teresa university,mother of teresa university,mother teresa university,mother of teresa university,0.941,en,similarity,correct_merge
+2745,3305,kuvendit,kuvend,kuvendit,kuvend,1.0,sq,similarity,correct_merge
+5736,5271,tumcevishte,s tumchevishte,tumcevishte,s tumchevishte,0.88,"mk,sq",similarity,correct_merge
+1497,2058,kopance,s kopance,kopance,s kopance,0.875,"mk,sq",similarity,correct_merge
+519,1385,mickovska,mickoski,mickovska,mickoski,0.824,"en,mk,sq,tr",similarity,false_merge
+2,221,western balkans,western balkan,western balkans,western balkan,0.966,"en,tr",similarity,correct_merge
+2435,4488,maqedoni,makedonci,maqedoni,makedonci,0.824,"mk,sq,tr",similarity,false_merge
+3965,3976,house judiciary committee,house january committee,house judiciary committee,house january committee,0.875,en,similarity,false_merge
+2213,3335,kurirrs,kurir,kurirrs,kurir,0.833,mk,similarity,correct_merge
+1196,3327,dolno lisiche,novo lisiche,dolno lisiche,novo lisiche,0.8,mk,similarity,false_merge
+1478,2820,evrostat,eurostat,evrostat,eurostat,0.875,"mk,sq",similarity,correct_merge
+2039,5085,opshtina chair,opshtina centar,opshtina chair,opshtina centar,0.828,mk,similarity,false_merge
+5753,5283,orashac,s orashac,orashac,s orashac,0.875,"mk,sq",similarity,correct_merge
+154,4445,truthmetermk,truthmeter,truthmetermk,truthmeter,0.909,en,similarity,correct_merge
+1138,4722,germanija,ermanija,germanija,ermanija,0.941,mk,similarity,correct_merge
+1260,4053,centarot za javno zdravje,centar za javno zdravje skopje,centarot za javno zdravje,centar za javno zdravje skopje,0.836,mk,similarity,correct_merge
+2606,2667,ministria e jashtme,ministria e brendshme,ministria e jashtme,ministria e brendshme,0.8,sq,similarity,false_merge
+2962,971,maqedonia,makedonija,maqedonia,makedonija,0.842,"mk,sq",similarity,correct_merge
+1134,5029,istragata,istraga,istragata,istraga,0.875,mk,similarity,correct_merge
+3206,3210,gazimestan,gazimestanit,gazimestan,gazimestanit,1.0,sq,similarity,correct_merge
+1498,5742,rashche,rashce,rashche,rashce,0.923,"mk,sq",similarity,correct_merge
+1419,2459,kristijano ronaldo,cristiano ronaldo,kristijano ronaldo,cristiano ronaldo,0.914,"mk,sq",similarity,correct_merge
+2819,5510,rumanine,rumania,rumanine,rumania,0.8,"sq,tr",similarity,correct_merge
+524,868,macedonian ecological society med,macedonian ecological society,macedonian ecological society med,macedonian ecological society,0.935,en,similarity,correct_merge
+5863,5864,rpe adasin,kerpe adasi,rpe adasin,kerpe adasi,0.857,tr,similarity,ambiguous
+2777,2710,qendra e menaxhimit te krizave,qendra per menaxhimin e krizave,qendra e menaxhimit te krizave,qendra per menaxhimin e krizave,0.918,sq,similarity,correct_merge
+447,992,saso mijalkov,sasho mijalkov,saso mijalkov,sasho mijalkov,0.963,mk,similarity,correct_merge
+1305,1307,krizen shtab,krizniot shtab,krizen shtab,krizniot shtab,0.846,mk,similarity,correct_merge
+1340,1343,nik kirgios,nik kirijos,nik kirgios,nik kirijos,0.909,mk,similarity,correct_merge
+115,1847,lake ohrid,vila ohrid,lake ohrid,vila ohrid,0.8,"en,mk",similarity,false_merge
+5639,5649,ushtrise amerikane,ushtria amerikane,ushtrise amerikane,ushtria amerikane,0.914,sq,similarity,correct_merge
+1598,1276,direkcijata za zashtita i spasuvanje dzs,direkcija za zashtita i spasuvanje,direkcijata za zashtita i spasuvanje dzs,direkcija za zashtita i spasuvanje,0.919,mk,similarity,correct_merge
+2403,2748,bashkimi evropian,bashkimit evropian,bashkimi evropian,bashkimit evropian,0.971,sq,similarity,correct_merge
+1328,5044,aleksandar kostoski,aleksandar nikoloski,aleksandar kostoski,aleksandar nikoloski,0.872,mk,similarity,false_merge
+2224,152,ukraines,ukraine,ukraines,ukraine,0.933,"en,sq,tr",similarity,correct_merge
+150,2233,russia,rusia,russia,rusia,0.909,"en,sq,tr",similarity,correct_merge
+4647,1408,hajden panetier,hejden panetier,hajden panetier,hejden panetier,0.933,mk,similarity,correct_merge
+2052,3260,va,eva,va,eva,0.8,mk,similarity,ambiguous
+2815,2680,slloveni,sllovenia,slloveni,sllovenia,0.95,sq,similarity,correct_merge
+1895,1896,skopje petrovec,skopjepetrovec,skopje petrovec,skopjepetrovec,0.966,,similarity,correct_merge
+4451,4455,hamas,hama,hamas,hama,0.889,en,similarity,ambiguous
+5836,5837,man yanginlarinin y,an yanginlarini ko,man yanginlarinin y,an yanginlarini ko,0.865,tr,similarity,ambiguous
+1452,1618,apsenjeto,apsenje,apsenjeto,apsenje,0.875,mk,similarity,correct_merge
+2716,1753,zelenikoves,zelenikovo,zelenikoves,zelenikovo,0.857,"mk,sq",similarity,correct_merge
+4239,1683,uefas,uefa,uefas,uefa,0.889,"mk,tr",similarity,correct_merge
+1126,395,krushevac,krusevac,krushevac,krusevac,0.941,"en,tr",similarity,correct_merge
+263,4249,artan grubi,artan grubit,artan grubi,artan grubit,1.0,"en,mk,tr",similarity,correct_merge
+736,495,parliamentary byelection,parliamentary elections,parliamentary byelection,parliamentary elections,0.936,en,similarity,correct_merge
+679,681,gostivar basic prosecutors office,gostivar prosecutors office,gostivar basic prosecutors office,gostivar prosecutors office,0.9,,similarity,false_merge
+5204,1355,zonskite kvalifikacii,bva zonskite kvalifikacii za ep,zonskite kvalifikacii,bva zonskite kvalifikacii za ep,0.808,mk,similarity,correct_merge
+1884,4788,upravata za hidrometeoroloshki raboti,upravata za hidrometeoroloshki raboti uhmr,upravata za hidrometeoroloshki raboti,upravata za hidrometeoroloshki raboti uhmr,0.937,mk,similarity,correct_merge
+2777,2574,qendra e menaxhimit te krizave,qendres per menaxhim me kriza,qendra e menaxhimit te krizave,qendres per menaxhim me kriza,0.814,sq,similarity,correct_merge
+1601,2059,deponijata bukovo,deponija bukovo,deponijata bukovo,deponija bukovo,0.938,mk,similarity,correct_merge
+1598,1456,direkcijata za zashtita i spasuvanje dzs,direkcijata za zashtita i spasuvanje,direkcijata za zashtita i spasuvanje dzs,direkcijata za zashtita i spasuvanje,0.947,mk,similarity,correct_merge

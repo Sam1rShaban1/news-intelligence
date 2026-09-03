@@ -38,3 +38,7 @@ models/
 *.swp
 *.swo
 .DS_Store
+
+eval/media/
+eval/*.bak
+eval/llm_batch*.txt

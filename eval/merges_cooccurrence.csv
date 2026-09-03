@@ -1,0 +1,102 @@
+# provenance: {"date_run": "2026-09-03T21:53:23.416084+00:00", "git_commit": "unknown", "hardware": {"platform": "Linux-7.1.3-arch1-2-x86_64-with-glibc2.41", "machine": "x86_64", "processor": "unknown", "cpu_count": 16, "python": "3.14.7", "mem_total": "MemTotal:       16052400 kB", "tier_hint": "vps-or-unknown"}, "docker_images": {"backend_image": "ghcr.io/sam1rshaban1/news-intelligence-worker", "frontend_image": "ghcr.io/sam1rshaban1/news-intelligence-frontend", "image_tag": "latest"}, "seed": 42, "python_argv": ["eval/sample_merges.py", "--strategy", "cooccurrence", "--n", "100", "--seed", "42", "--out", "eval/merges_cooccurrence.csv"], "params": {"strategy": "cooccurrence", "threshold": 5}}
+a_id,b_id,a_text,b_text,a_normalized,b_normalized,similarity_or_weight,languages,strategy,label
+1018,1804,ministerstvoto za vnatreshni raboti,aleksandar vuchikj,ministerstvoto za vnatreshni raboti,aleksandar vuchikj,6,mk,cooccurrence,false_merge
+389,1205,strumica,pozhar,strumica,pozhar,5,"en,mk,sq",cooccurrence,false_merge
+3189,5886,kongo,alijansa za albancite,kongo,alijansa za albancite,5,mk,cooccurrence,false_merge
+176,6054,sasho bogdanovski,metamorphosis,sasho bogdanovski,metamorphosis,12,en,cooccurrence,false_merge
+96,4094,struga,peru,struga,peru,8,"en,mk",cooccurrence,false_merge
+971,1362,makedonija,dezinsekcija protiv komarci,makedonija,dezinsekcija protiv komarci,6,mk,cooccurrence,false_merge
+842,5687,safe city,ethet,safe city,ethet,7,"en,sq,tr",cooccurrence,false_merge
+7,218,eu,france,eu,france,5,"en,mk,sq,tr",cooccurrence,false_merge
+5386,5397,dejv grol,zapadniot breg,dejv grol,zapadniot breg,10,mk,cooccurrence,false_merge
+1385,5674,mickoski,struges,mickoski,struges,10,"mk,sq,tr",cooccurrence,false_merge
+275,316,vmro dpmne,social democrats,vmro dpmne,social democrats,7,"en,tr",cooccurrence,false_merge
+6,181,north macedonia,european trust alliance,north macedonia,european trust alliance,13,"en,tr",cooccurrence,false_merge
+7,445,eu,balkan,eu,balkan,6,"en,mk,tr",cooccurrence,false_merge
+4550,5892,irska,los,irska,los,7,mk,cooccurrence,false_merge
+971,1198,makedonija,zemjava,makedonija,zemjava,9,mk,cooccurrence,false_merge
+6057,6058,khushbu,vilma,khushbu,vilma,12,en,cooccurrence,false_merge
+6037,6044,melovski,wolves,melovski,wolves,17,en,cooccurrence,false_merge
+1523,5395,izrael,dc,izrael,dc,9,mk,cooccurrence,false_merge
+971,1457,makedonija,mariovo,makedonija,mariovo,6,mk,cooccurrence,false_merge
+6060,6064,democrats,feinstein,democrats,feinstein,19,en,cooccurrence,false_merge
+1055,5389,romanija,fon der lajen,romanija,fon der lajen,20,mk,cooccurrence,false_merge
+6,326,north macedonia,edi rama,north macedonia,edi rama,6,"en,tr",cooccurrence,false_merge
+96,5906,struga,sedat sulejmani,struga,sedat sulejmani,6,"en,mk",cooccurrence,false_merge
+310,971,hristijan mickoski,makedonija,hristijan mickoski,makedonija,10,"en,mk,sq,tr",cooccurrence,false_merge
+6056,6057,international organization international,khushbu,international organization international,khushbu,12,en,cooccurrence,false_merge
+220,310,bulgaria,hristijan mickoski,bulgaria,hristijan mickoski,5,"en,mk,sq,tr",cooccurrence,false_merge
+176,6057,sasho bogdanovski,khushbu,sasho bogdanovski,khushbu,12,en,cooccurrence,false_merge
+96,97,struga,ohrid,struga,ohrid,12,"en,mk",cooccurrence,false_merge
+612,1458,prilep,chanishte,prilep,chanishte,8,"en,mk",cooccurrence,false_merge
+5392,6011,parlamentarnite izbori,portokalova faza,parlamentarnite izbori,portokalova faza,5,mk,cooccurrence,false_merge
+19,33,skopje,gazi baba,skopje,gazi baba,9,"en,mk,sq,tr",cooccurrence,false_merge
+986,1150,evropa,sad,evropa,sad,9,"mk,sq",cooccurrence,false_merge
+19,1198,skopje,zemjava,skopje,zemjava,6,"en,mk,sq,tr",cooccurrence,false_merge
+1237,1966,delchevo,mogila,delchevo,mogila,6,mk,cooccurrence,false_merge
+1236,1366,dzs,vinica,dzs,vinica,5,mk,cooccurrence,false_merge
+253,612,bitola,prilep,bitola,prilep,12,"en,mk",cooccurrence,false_merge
+1770,5386,koncert,dejv grol,koncert,dejv grol,20,mk,cooccurrence,false_merge
+6,557,north macedonia,romania,north macedonia,romania,7,"en,tr",cooccurrence,false_merge
+971,1184,makedonija,zapadnonilska treska,makedonija,zapadnonilska treska,12,mk,cooccurrence,false_merge
+1016,1237,kochani,delchevo,kochani,delchevo,6,mk,cooccurrence,false_merge
+6053,6056,marija,international organization international,marija,international organization international,12,en,cooccurrence,false_merge
+19,535,skopje,gostivar,skopje,gostivar,11,"en,mk,sq,tr",cooccurrence,false_merge
+1752,1753,arachinovo,zelenikovo,arachinovo,zelenikovo,9,mk,cooccurrence,false_merge
+1157,1173,kanada,norveshka,kanada,norveshka,20,"mk,tr",cooccurrence,false_merge
+5394,5395,e,dc,e,dc,9,mk,cooccurrence,false_merge
+535,1233,gostivar,tearce,gostivar,tearce,5,"mk,sq",cooccurrence,false_merge
+6070,6073,robert,nebojsa,robert,nebojsa,19,tr,cooccurrence,false_merge
+1179,1322,sasho klekovski,petrovec,sasho klekovski,petrovec,5,"mk,sq",cooccurrence,false_merge
+96,1125,struga,srbija,struga,srbija,9,"en,mk",cooccurrence,false_merge
+97,971,ohrid,makedonija,ohrid,makedonija,19,"en,mk",cooccurrence,false_merge
+2703,4094,janevska,peru,janevska,peru,5,"mk,sq,tr",cooccurrence,false_merge
+1016,1753,kochani,zelenikovo,kochani,zelenikovo,5,mk,cooccurrence,false_merge
+33,1751,gazi baba,sopishte,gazi baba,sopishte,5,"en,mk,sq",cooccurrence,false_merge
+5391,5394,foo fighters,e,foo fighters,e,20,mk,cooccurrence,false_merge
+21,120,greece,serbia,greece,serbia,23,"en,sq,tr",cooccurrence,false_merge
+141,6081,sweden,international,sweden,international,18,en,cooccurrence,false_merge
+7,1780,eu,cheshka,eu,cheshka,5,"en,mk,tr",cooccurrence,false_merge
+4792,5389,bezbeden grad,fon der lajen,bezbeden grad,fon der lajen,5,mk,cooccurrence,false_merge
+6054,6057,metamorphosis,khushbu,metamorphosis,khushbu,12,en,cooccurrence,false_merge
+83,6054,metamorphosis foundation,metamorphosis,metamorphosis foundation,metamorphosis,12,"en,tr",cooccurrence,correct_merge
+1125,5398,srbija,kanada,srbija,kanada,10,mk,cooccurrence,false_merge
+1458,1504,chanishte,makedonski brod,chanishte,makedonski brod,6,"mk,sq",cooccurrence,false_merge
+1125,5892,srbija,los,srbija,los,7,mk,cooccurrence,false_merge
+5900,5903,amerikanskiot geoloshki zavod,jugoistochna irska,amerikanskiot geoloshki zavod,jugoistochna irska,7,mk,cooccurrence,false_merge
+1635,5892,zemjotres,los,zemjotres,los,7,mk,cooccurrence,false_merge
+3189,5906,kongo,sedat sulejmani,kongo,sedat sulejmani,6,mk,cooccurrence,false_merge
+612,1257,prilep,shtip,prilep,shtip,6,"en,mk",cooccurrence,false_merge
+32,1197,butel,skopskiot region,butel,skopskiot region,5,"en,mk,sq",cooccurrence,false_merge
+1157,5389,kanada,fon der lajen,kanada,fon der lajen,20,"mk,tr",cooccurrence,false_merge
+165,6059,european factchecking standards network,the eu,european factchecking standards network,the eu,12,en,cooccurrence,false_merge
+1686,1688,meden mesec,mojddv,meden mesec,mojddv,10,mk,cooccurrence,false_merge
+1125,1137,srbija,hrvatska,srbija,hrvatska,7,mk,cooccurrence,false_merge
+4585,5392,zelenski,parlamentarnite izbori,zelenski,parlamentarnite izbori,5,mk,cooccurrence,false_merge
+7,390,eu,aleksandar vucic,eu,aleksandar vucic,7,"en,mk,sq,tr",cooccurrence,false_merge
+657,6032,austria,denmark,austria,denmark,18,"sq,tr",cooccurrence,false_merge
+7,156,eu,united states,eu,united states,5,"en,mk,tr",cooccurrence,false_merge
+253,1125,bitola,srbija,bitola,srbija,5,"en,mk",cooccurrence,false_merge
+5674,5678,struges,mickoskiradev,struges,mickoskiradev,10,"sq,tr",cooccurrence,false_merge
+6043,6044,skopje,wolves,skopje,wolves,17,en,cooccurrence,false_merge
+1385,4550,mickoski,irska,mickoski,irska,7,"mk,sq,tr",cooccurrence,false_merge
+1490,1497,saraj,kopance,saraj,kopance,5,"mk,sq,tr",cooccurrence,false_merge
+842,3036,safe city,belgjikes,safe city,belgjikes,9,"en,sq,tr",cooccurrence,false_merge
+6062,6065,republicans,graham,republicans,graham,19,en,cooccurrence,false_merge
+3036,5676,belgjikes,nilit,belgjikes,nilit,10,"sq,tr",cooccurrence,false_merge
+857,971,gordana siljanovskadavkova,makedonija,gordana siljanovskadavkova,makedonija,7,"en,mk",cooccurrence,false_merge
+6069,6073,uros,nebojsa,uros,nebojsa,19,tr,cooccurrence,false_merge
+6,310,north macedonia,hristijan mickoski,north macedonia,hristijan mickoski,15,"en,mk,sq,tr",cooccurrence,false_merge
+3189,5904,kongo,cukerberg,kongo,cukerberg,5,mk,cooccurrence,false_merge
+332,2272,donald trump,shbase,donald trump,shbase,5,"en,sq,tr",cooccurrence,false_merge
+1236,1271,dzs,stojanche angelov,dzs,stojanche angelov,5,mk,cooccurrence,false_merge
+1523,5390,izrael,vuchikj,izrael,vuchikj,20,mk,cooccurrence,false_merge
+19,30,skopje,veles,skopje,veles,8,"en,mk,sq,tr",cooccurrence,false_merge
+1158,1695,albanija,puls,albanija,puls,6,mk,cooccurrence,false_merge
+612,1496,prilep,novaci,prilep,novaci,7,"en,mk",cooccurrence,false_merge
+44,47,johanna henkevon der malsburg,brazil,johanna henkevon der malsburg,brazil,23,"en,mk",cooccurrence,false_merge
+120,218,serbia,france,serbia,france,5,"en,sq,tr",cooccurrence,false_merge
+971,1179,makedonija,sasho klekovski,makedonija,sasho klekovski,5,"mk,sq",cooccurrence,false_merge
+1016,1506,kochani,studenichani,kochani,studenichani,5,mk,cooccurrence,false_merge
+6070,6076,robert,mladenovski,robert,mladenovski,19,tr,cooccurrence,false_merge
+1490,1966,saraj,mogila,saraj,mogila,5,"mk,sq,tr",cooccurrence,false_merge
