@@ -49,8 +49,14 @@ jobs:
       - name: Dependency audit (pip-audit, blocking)
         # Fails the build on ANY known vulnerability in the pinned dependency
         # tree. Keep deps patched; use --ignore-vuln <ID> only for documented,
-        # accepted risks.
-        run: pip-audit -r requirements/base.lock -r requirements/vps.lock
+        # accepted risks (see SECURITY.md "Accepted dependency risks").
+        # PYSEC-2026-3740 (nltk 3.10.3, pathsec bypass in model train/save/load
+        # APIs): unpatched upstream, and this repo never calls those APIs with
+        # caller-controlled paths (nltk is only used for tokenizer corpora via
+        # newspaper4k). Revisit on every nltk release.
+        run: >-
+          pip-audit -r requirements/base.lock -r requirements/vps.lock
+          --ignore-vuln PYSEC-2026-3740
 
   frontend:
     runs-on: ubuntu-latest

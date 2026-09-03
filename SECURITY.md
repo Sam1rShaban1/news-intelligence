@@ -47,3 +47,20 @@ the code in this repository, not misconfigurations of a self-hosted instance.
 The application bundles third-party ML models (GLiNER2, XLM-RoBERTa sentiment,
 VADER) and libraries — see the `NOTICE` file for attribution. Vulnerabilities in
 those upstream components should be reported to their respective maintainers.
+
+## Accepted dependency risks
+
+CI (`pip-audit`, blocking) ignores the following IDs. Each entry must state why
+the risk is accepted and when to revisit it.
+
+- **PYSEC-2026-3740** (`nltk==3.10.3`, GHSA-8mgp-746c-j5xp / CVE-2026-81726):
+  pathsec sandbox bypass in NLTK model-artifact APIs (`TransitionParser.train` /
+  `parse`, `AveragedPerceptron.save` / `load`, `PerceptronTagger.save_to_json`,
+  `save_maxent_params`). Exploitation requires the application to enable pathsec
+  enforcement *and* let untrusted callers choose model import/export paths.
+  This repo uses NLTK only for tokenizer corpora (`punkt`, `punkt_tab`,
+  `averaged_perceptron_tagger`) consumed by `newspaper4k` — those APIs are never
+  called, let alone with caller-controlled paths. Upstream has **no patched
+  release** (PyPI latest is 3.10.3), so upgrading is not an option.
+  **Revisit:** drop the `--ignore-vuln` in `ci.yml` as soon as NLTK publishes a
+  fixed version and re-pin `requirements/*.lock`.
