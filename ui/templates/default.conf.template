@@ -25,7 +25,7 @@ server {
         # Inject the API key at the proxy so the browser never holds it.
         # API_KEY is environment-substituted by the nginx image's entrypoint
         # (empty = auth disabled, which preserves current behaviour).
-        proxy_set_header X-API-Key ${API_KEY};
+        proxy_set_header X-API-Key "${API_KEY}";
     }
 
     # Hashed static assets: cache forever and NEVER fall back to index.html.
