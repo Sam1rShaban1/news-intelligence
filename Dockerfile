@@ -6,6 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Every service command is `python -m ...` / `python scripts/...`, so the
+# entrypoint must apply to ALL build targets (vps and pi alike).
+ENTRYPOINT ["python"]
+
 # System deps for newspaper4k, lxml, psycopg2, healthchecks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev libxml2-dev libxslt1-dev curl \
@@ -59,5 +63,3 @@ RUN mkdir -p /app/models && \
 # Run as a non-root user in the final image.
 RUN useradd -m -u 10001 -s /usr/sbin/nologin app && chmod -R a+rX /usr/share/nltk_data
 USER app
-
-ENTRYPOINT ["python"]
