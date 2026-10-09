@@ -19,7 +19,36 @@ function shortDate(iso?: string): string {
   return `${MONTHS[m]} ${d}`
 }
 
+// 0 = all time (see /analytics/overview?days=0)
+const DAYS_OPTIONS = [0, 7, 30, 90, 365]
+const INTERVAL_OPTIONS = ['day', 'week', 'month'] as const
+
+function daysLabel(d: number): string {
+  return d === 0 ? 'ALL' : `${d}D`
+}
+
+/** Pick a bucket size that keeps the chart readable for the chosen window. */
+function autoInterval(d: number): typeof INTERVAL_OPTIONS[number] {
+  if (d === 0 || d > 180) return 'month'
+  if (d > 30) return 'week'
+  return 'day'
+}
+
+const segBtn = (active: boolean) => ({
+  padding: '4px 10px',
+  border: 'none',
+  background: active ? '#0a0a0a' : 'transparent',
+  color: active ? '#f5f5f0' : '#0a0a0a',
+  fontSize: 9,
+  letterSpacing: '0.1em',
+  fontFamily: 'Space Mono, monospace',
+  fontWeight: 700,
+  cursor: 'pointer',
+} as const)
+
 export function Overview({ search: _search, onNav }: { search: string; onNav?: (v: View) => void }) {
+  const [days, setDays] = useState(0)
+  const [interval, setInterval] = useState<typeof INTERVAL_OPTIONS[number]>('month')
   const [data, setData] = useState<any>(null)
   const [dataError, setDataError] = useState(false)
   const [recentArticles, setRecentArticles] = useState<any[] | null>(null)
@@ -27,11 +56,19 @@ export function Overview({ search: _search, onNav }: { search: string; onNav?: (
   const [watchlist, setWatchlist] = useState<any[] | null>(null)
   const [alerts, setAlerts] = useState<any>(null)
 
+  // Time-series panel — refetches whenever the window or bucket size changes.
   useEffect(() => {
     const ac = new AbortController()
-    api.overview({ days: 7, interval: 'day' })
+    setData(null)
+    api.overview({ days, interval })
       .then(d => { if (!ac.signal.aborted) { setData(d); setDataError(false) } })
       .catch(() => { if (!ac.signal.aborted) setDataError(true) })
+    return () => ac.abort()
+  }, [days, interval])
+
+  // Everything else is window-independent — fetched once.
+  useEffect(() => {
+    const ac = new AbortController()
     api.search({ sort: 'recent', limit: 6 })
       .then((r: any) => { if (!ac.signal.aborted) setRecentArticles(r.results ?? []) })
       .catch(() => { if (!ac.signal.aborted) setRecentArticles([]) })
@@ -84,7 +121,36 @@ export function Overview({ search: _search, onNav }: { search: string; onNav?: (
 
   return (
     <div>
-      <Section title="SITUATION REPORT" sub={`AS OF ${new Date().toISOString().slice(0, 10)}`}>
+      <Section
+        title="SITUATION REPORT"
+        sub={`AS OF ${new Date().toISOString().slice(0, 10)}`}
+      >
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 8, color: '#555550', letterSpacing: '0.1em' }}>WINDOW</span>
+          <div style={{ display: 'flex', border: '1px solid #0a0a0a' }}>
+            {DAYS_OPTIONS.map((d, i) => (
+              <button
+                key={d}
+                onClick={() => { setDays(d); setInterval(autoInterval(d)) }}
+                style={{ ...segBtn(days === d), borderRight: i < DAYS_OPTIONS.length - 1 ? '1px solid #0a0a0a' : 'none' }}
+              >
+                {daysLabel(d)}
+              </button>
+            ))}
+          </div>
+          <span style={{ fontSize: 8, color: '#555550', letterSpacing: '0.1em' }}>BUCKET</span>
+          <div style={{ display: 'flex', border: '1px solid #0a0a0a' }}>
+            {INTERVAL_OPTIONS.map((iv, i) => (
+              <button
+                key={iv}
+                onClick={() => setInterval(iv)}
+                style={{ ...segBtn(interval === iv), borderRight: i < INTERVAL_OPTIONS.length - 1 ? '1px solid #0a0a0a' : 'none' }}
+              >
+                {iv.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
         {!data && !dataError ? (
           <SkelKpiRow count={6} />
         ) : dataError ? (
@@ -98,18 +164,18 @@ export function Overview({ search: _search, onNav }: { search: string; onNav?: (
                 ? `${articleStats.analyzed.toLocaleString()} ANALYZED · ${Math.max(0, articleStats.total - articleStats.analyzed).toLocaleString()} IN PIPELINE`
                 : 'TOTAL / PROCESSED'}
             />
-            <KpiTile label="ARTICLES (7D)" value={totalPos + totalNeg + totalNeu} sub="SENTIMENT TRACKED" />
+            <KpiTile label={`ARTICLES (${daysLabel(days)})`} value={(totalPos + totalNeg + totalNeu).toLocaleString()} sub="SENTIMENT TRACKED" />
             <KpiTile label="POSITIVE" value={`${Math.round(totalPos / totalSent * 100)}%`} sub={`${totalPos} ARTICLES`} />
             <KpiTile label="NEUTRAL" value={`${Math.round(totalNeu / totalSent * 100)}%`} sub={`${totalNeu} ARTICLES`} />
             <KpiTile label="NEGATIVE" value={`${Math.round(totalNeg / totalSent * 100)}%`} sub={`${totalNeg} ARTICLES`} />
             <KpiTile label="ENTITIES" value={trending.length > 0 ? `${trending.length}+` : '—'} sub="TRENDING" />
-            <KpiTile label="INTERVAL" value={(data.interval ?? '—').toUpperCase()} sub={`${data.days ?? '?'}D WINDOW`} />
+            <KpiTile label="INTERVAL" value={(data.interval ?? '—').toUpperCase()} sub={`${days === 0 ? 'ALL TIME' : `${data.days}D WINDOW`}`} />
           </div>
         )}
       </Section>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Section title="SENTIMENT OVER TIME" sub="7D WINDOW">
+        <Section title="SENTIMENT OVER TIME" sub={`${daysLabel(days)} WINDOW · ${(data?.interval ?? interval).toUpperCase()}`}>
           <Card>
             {!data && !dataError ? <SkelChartArea height={176} /> : sentData.length === 0 ? <EmptyState msg="NO DATA" /> : (
               <AreaChart data={sentData} config={sentConfig} bloom="off" className="h-44">
@@ -125,7 +191,7 @@ export function Overview({ search: _search, onNav }: { search: string; onNav?: (
           </Card>
         </Section>
 
-        <Section title="LANGUAGE MIX" sub="DAILY DISTRIBUTION">
+        <Section title="LANGUAGE MIX" sub={`${daysLabel(days)} WINDOW · ${(data?.interval ?? interval).toUpperCase()}`}>
           <Card>
             {!data && !dataError ? <SkelChartArea height={176} /> : langData.length === 0 ? <EmptyState msg="NO DATA" /> : (
               <BarChart data={langData} config={langConfig} bloom="off" className="h-44">

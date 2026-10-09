@@ -17,15 +17,19 @@ router = APIRouter(tags=["analytics"])
 
 @router.get("/analytics/overview")
 def analytics_overview(
-    days: int = Query(default=30, ge=1, le=365),
+    days: int = Query(default=30, ge=0, le=3650, description="Window in days; 0 = all time"),
     interval: str = Query(default="day", description="day | week | month"),
     language: str | None = Query(default=None, description="Restrict to a language"),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Aggregated trends over the last `days`."""
+    """Aggregated trends over the last `days` (0 = all time)."""
     if interval not in ("day", "week", "month"):
         interval = "day"
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days > 0 else None
+
+    def in_window(stmt):
+        """Apply the time window (skipped entirely for all-time, days=0)."""
+        return stmt if cutoff is None else stmt.where(Article.discovered_at >= cutoff)
 
     # ── Sentiment over time ──────────────────────────────────
     sot = (
@@ -35,8 +39,9 @@ def analytics_overview(
             func.count(Article.id).label("cnt"),
             func.coalesce(func.avg(Article.sentiment_score), 0.0).label("avg_score"),
         )
-        .where(Article.sentiment_label.isnot(None), Article.discovered_at >= cutoff)
+        .where(Article.sentiment_label.isnot(None))
     )
+    sot = in_window(sot)
     if language:
         sot = sot.where(Article.language == language)
     sot = sot.where(Article.status.notin_(["failed", "duplicate"]))
@@ -59,8 +64,8 @@ def analytics_overview(
             Article.language,
             func.count(Article.id).label("cnt"),
         )
-        .where(Article.discovered_at >= cutoff)
     )
+    lm = in_window(lm)
     if language:
         lm = lm.where(Article.language == language)
     lm = lm.where(Article.status.notin_(["failed", "duplicate"]))
@@ -82,8 +87,8 @@ def analytics_overview(
         )
         .join(Entity, Entity.node_id == EntityNode.id)
         .join(Article, Entity.article_id == Article.id)
-        .where(Article.discovered_at >= cutoff)
     )
+    te = in_window(te)
     if language:
         te = te.where(Article.language == language)
     te = te.group_by(EntityNode.id).order_by(desc("mentions")).limit(20)
@@ -91,6 +96,7 @@ def analytics_overview(
 
     return {
         "days": days,
+        "all_time": days == 0,
         "interval": interval,
         "sentiment_over_time": list(sentiment_over_time.values()),
         "language_mix": list(language_mix.values()),
