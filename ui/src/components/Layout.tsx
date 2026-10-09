@@ -47,9 +47,6 @@ export function Layout({ view, onNav, search, onSearch, online, children }: Layo
                 width: 42,
                 height: 42,
                 objectFit: 'contain',
-                borderRadius: 8,
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.25)',
-                background: '#f5f5f0',
               }}
             />
           </div>
